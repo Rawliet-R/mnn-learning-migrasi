@@ -1,0 +1,167 @@
+[
+  {
+    "id": "Z_05-03",
+    "package": "V10",
+    "section": "choukai",
+    "question_type": "audio_image",
+    "question": "menurut pria tersebut apa yang bisa dilakukan di Hokkaido?",
+    "choices": ["[選択肢A: 食べる]", "[選択肢C: 海で泳ぐ]", "[選択肢B: 南国のビーチ]"],
+    "answer": 0,
+    "audio_id": "Z_[05-03]",
+    "status": "locked"
+  },
+  {
+    "id": "Z_06-07_1",
+    "package": "V10",
+    "section": "choukai",
+    "question_type": "audio_image",
+    "question": "kenapa keretanya terlambat? (①)",
+    "choices": ["[選択肢A: 雨・悪天候]", "[選択肢B: 作業員・工事]", "[選択肢C: 踏切・車]"],
+    "answer": 1,
+    "audio_id": "Z_[06-07]",
+    "status": "locked"
+  },
+  {
+    "id": "Z_06-07_2",
+    "package": "V10",
+    "section": "choukai",
+    "question_type": "audio_text",
+    "question": "berapa lama keretanya terlambat? (②)",
+    "choices": ["15分", "3時半", "30分"],
+    "answer": 2,
+    "audio_id": "Z_[06-07]",
+    "status": "locked"
+  },
+  {
+    "id": "Z_06-10",
+    "package": "V10",
+    "section": "choukai",
+    "question_type": "audio_text",
+    "question": "bagaimana kesan mengenai kota Osaka, menurut laki-laki?",
+    "choices": ["串カツも食べられてよかった", "いろいろなところに行けてよかった", "まだ行ったことない"],
+    "answer": 1,
+    "audio_id": "Z_[06-10]",
+    "status": "locked"
+  },
+  {
+    "id": "Z_06-13",
+    "package": "V10",
+    "section": "choukai",
+    "question_type": "audio_image",
+    "question": "apa yang tidak dilakukan perempuan tersebut di Houstenbosch?",
+    "choices": ["[選択肢A: 花・観光]", "[選択肢B: 光のショー]", "[選択肢C: 乗り物・アトラクション]"],
+    "answer": 2,
+    "audio_id": "Z_[06-13]",
+    "status": "locked"
+  },
+  {
+    "id": "Z_07-04",
+    "package": "V10",
+    "section": "choukai",
+    "question_type": "audio_text",
+    "question": "jika hujan flea market akan diselenggarakan di mana?",
+    "choices": ["中のホール", "こうてい", "ひろばの外"],
+    "answer": 0,
+    "audio_id": "Z_[07-04]",
+    "status": "locked"
+  },
+  {
+    "id": "Z_08-06",
+    "package": "V10",
+    "section": "choukai",
+    "question_type": "audio_text",
+    "question": "flea market besok, dimulai jam berapa?",
+    "choices": ["12時", "10時", "11時"],
+    "answer": 1,
+    "audio_id": "Z_[08-06]",
+    "status": "locked"
+  },
+  {
+    "id": "Z_09-06",
+    "package": "V10",
+    "section": "choukai",
+    "question_type": "audio_text",
+    "question": "menurut laki-laki, apa yang dilakukan orang jepang ketika natal?",
+    "choices": ["フライドチキンを食べる", "かぞくといっしょにすごす", "友だちとケーキを食べる"],
+    "answer": 0,
+    "audio_id": "Z_[09-06]",
+    "status": "locked"
+  },
+  {
+    "id": "Z_09-08_1",
+    "package": "V10",
+    "section": "choukai",
+    "question_type": "audio_image",
+    "question": "apa yang dilakukan Nan ketika tahun baru? (①)",
+    "choices": ["[選択肢A: 家族と過ごす]", "[選択肢B: 観光・旅行]", "[選択肢C: テレビを見る]"],
+    "answer": 1,
+    "audio_id": "Z_[09-08]",
+    "status": "locked"
+  },
+  {
+    "id": "Z_09-08_2",
+    "package": "V10",
+    "section": "choukai",
+    "question_type": "audio_image",
+    "question": "apa yang dilakukan Miura ketika tahun baru? (②)",
+    "choices": ["[選択肢A: 家族と過ごす]", "[選択肢B: 観光・旅行]", "[選択肢C: テレビを見る]"],
+    "answer": 2,
+    "audio_id": "Z_[09-08]",
+    "status": "locked"
+  },
+  {
+    "id": "Z_11-24_1",
+    "package": "V10",
+    "section": "choukai",
+    "question_type": "audio_text",
+    "question": "benda apa yang terjatuh di toilet laki-laki lantai 3? (①)",
+    "choices": ["かぎ", "ぼうし", "ネクタイ"],
+    "answer": 0,
+    "audio_id": "Z_[11-24]",
+    "status": "locked"
+  },
+  {
+    "id": "Z_11-24_2",
+    "package": "V10",
+    "section": "choukai",
+    "question_type": "audio_text",
+    "question": "sebaiknya pergi kemana jika ingin mengambil kunci tersebut? (②)",
+    "choices": ["モールのうけつけ", "インフォメーションカウンター", "いりぐちのまえ"],
+    "answer": 1,
+    "audio_id": "Z_[11-24]",
+    "status": "locked"
+  },
+  {
+    "id": "Z_13-09",
+    "package": "V10",
+    "section": "choukai",
+    "question_type": "audio_text",
+    "question": "fasilitas gratis apa yang disediakan dari pemandian?",
+    "choices": ["シャンプー", "タオル", "せっけん"],
+    "answer": 0,
+    "audio_id": "Z_[13-09]",
+    "status": "locked"
+  },
+  {
+    "id": "Z_15-04",
+    "package": "V10",
+    "section": "choukai",
+    "question_type": "audio_text",
+    "question": "apa yang harus dilakukan untuk menghemat kertas ketika fotokopi?",
+    "choices": ["りょうめんコピーします", "いちまいコピーします", "コピー機を使い終わったら、けします"],
+    "answer": 0,
+    "audio_id": "Z_[15-04]",
+    "status": "locked"
+  },
+  {
+    "id": "Z_18-14",
+    "package": "V10",
+    "section": "choukai",
+    "question_type": "audio_text",
+    "question": "saran apa yang diberikan oleh laki-laki kepada perempuan dalam percakapan?",
+    "choices": ["日本語の勉強をがんばるといいです", "毎日、日本語の本を読むといいです", "いい先生をえらぶといいです"],
+    "answer": 0,
+    "audio_id": "Z_[18-14]",
+    "status": "locked"
+  }
+]

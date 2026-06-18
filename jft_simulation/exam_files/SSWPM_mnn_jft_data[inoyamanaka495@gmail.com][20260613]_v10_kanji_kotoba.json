@@ -1,0 +1,171 @@
+[
+  {
+    "id": "KK_V10_01",
+    "package": "V10",
+    "section": "kanji_kotoba",
+    "question_type": "image",
+    "question": "画像の名前は何ですか。",
+    "image_ref": "KK_V10_01_img",
+    "choices": ["わりばし", "ごみぶくろ", "べぶくろ"],
+    "answer": 0,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "KK_V10_02",
+    "package": "V10",
+    "section": "kanji_kotoba",
+    "question_type": "image",
+    "question": "画像の名前は何ですか。",
+    "image_ref": "KK_V10_02_img",
+    "choices": ["ネクサス", "ネクタイ", "ピアス"],
+    "answer": 2,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "KK_V10_03",
+    "package": "V10",
+    "section": "kanji_kotoba",
+    "question_type": "image",
+    "question": "画像の名前は何ですか。",
+    "image_ref": "KK_V10_03_img",
+    "choices": ["はなたば", "はちうえ", "はなばたけ"],
+    "answer": 0,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "KK_V10_04",
+    "package": "V10",
+    "section": "kanji_kotoba",
+    "question_type": "image",
+    "question": "画像の名前は何ですか。",
+    "image_ref": "KK_V10_04_img",
+    "choices": ["ぽっと", "そうじき", "すいはんき"],
+    "answer": 0,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "KK_V10_05",
+    "package": "V10",
+    "section": "kanji_kotoba",
+    "question_type": "fill",
+    "question": "ちょっと、（　）がうすいです。",
+    "choices": ["あじ", "いみ", "げんき", "ピアス"],
+    "answer": 0,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "KK_V10_06",
+    "package": "V10",
+    "section": "kanji_kotoba",
+    "question_type": "fill",
+    "question": "トイレットペーパーがもうすぐ（　）そうです。",
+    "choices": ["びょうきになり", "なくなり", "げんきにり", "こまらなくなり"],
+    "answer": 1,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "KK_V10_07",
+    "package": "V10",
+    "section": "kanji_kotoba",
+    "question_type": "fill",
+    "question": "今日、5時に（　）もいいでしょうか。",
+    "choices": ["そうたいした", "そうたいする", "そうたいして", "そうたいし"],
+    "answer": 2,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "KK_V10_08",
+    "package": "V10",
+    "section": "kanji_kotoba",
+    "question_type": "reading",
+    "question": "【夕方】、あした、いっしょに出かけませんか。\n下線の読み方を選んでください。",
+    "choices": ["ゆうがた", "ゆうべ", "ゆうひ", "ゆうかた"],
+    "answer": 0,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "KK_V10_09",
+    "package": "V10",
+    "section": "kanji_kotoba",
+    "question_type": "reading",
+    "question": "ゆうべ、とても【寒かった】です。\n下線の読み方を選んでください。",
+    "choices": ["さむかった", "すずしかった", "あつかった", "ひろかった"],
+    "answer": 0,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "KK_V10_10",
+    "package": "V10",
+    "section": "kanji_kotoba",
+    "question_type": "reading",
+    "question": "【昨日】はかぜがつよかったです。\n下線の読み方を選んでください。",
+    "choices": ["おととい", "あさって", "あした", "きのう"],
+    "answer": 3,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "KK_V10_11",
+    "package": "V10",
+    "section": "kanji_kotoba",
+    "question_type": "reading",
+    "question": "たちばなこうえんは、【とおい】けど、しずかでいいですよ。\n下線の漢字を選んでください。",
+    "choices": ["遠い", "近い", "長い", "暗い"],
+    "answer": 0,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "KK_V10_12",
+    "package": "V10",
+    "section": "kanji_kotoba",
+    "question_type": "reading",
+    "question": "車で【おくります】よ。\n下線の漢字を選んでください。",
+    "choices": ["送ります", "帰ります", "取ります", "降ります"],
+    "answer": 0,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "KK_V10_13",
+    "package": "V10",
+    "section": "kanji_kotoba",
+    "question_type": "reading",
+    "question": "むりょうで日本語を【おしえています】。\n下線の漢字を選んでください。",
+    "choices": ["伝えています", "覚えています", "教えています"],
+    "answer": 2,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "KK_V10_14",
+    "package": "V10",
+    "section": "kanji_kotoba",
+    "question_type": "reading",
+    "question": "私は、おはしとお【皿】を持って行きます。\n下線の読み方を選んでください。",
+    "choices": ["はし", "から", "さら", "ばら"],
+    "answer": 2,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "KK_V10_15",
+    "package": "V10",
+    "section": "kanji_kotoba",
+    "question_type": "reading",
+    "question": "ちょっと【辛い】ですね。でも、おいしいです。\n下線の読み方を選んでください。",
+    "choices": ["まずい", "からい", "あまい", "にがい"],
+    "answer": 1,
+    "audio_id": null,
+    "status": "active"
+  }
+]

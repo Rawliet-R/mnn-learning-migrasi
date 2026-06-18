@@ -1,0 +1,9 @@
+{
+  "name": "mnn-learning",
+  "private": true,
+  "version": "3.0.0",
+  "description": "MNN Learning — みんなの日本語 Learning PWA (Rawliet.ID)",
+  "engines": {
+    "node": "20.x"
+  }
+}
