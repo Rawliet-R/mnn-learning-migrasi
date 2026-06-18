@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "uk.rawliet_app.twa",
+        "sha256_cert_fingerprints": ["7C:A2:85:70:02:F5:DB:9C:D8:3D:AB:B8:EC:01:14:AA:8C:04:7A:CD:DD:1E:DD:2D:71:C2:3D:F0:16:E4:09:5C"]
+      }
+    }]

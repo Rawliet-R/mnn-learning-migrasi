@@ -1,0 +1,20 @@
+# APK Distribution Directory
+#
+# Place the built APK here as:
+#   mnn-learning-latest.apk
+#
+# The file at this path is served at:
+#   https://rawliet-app.uk/apk/mnn-learning-latest.apk
+#
+# WORKFLOW — update APK:
+#   1. Build new APK via PWABuilder (https://pwabuilder.com)
+#      pointing at: https://rawliet-app.uk
+#   2. Replace this file:
+#      apk/mnn-learning-latest.apk
+#   3. Bump version in package.json
+#   4. Update RELEASE_NOTES in download.html
+#   5. Commit & push → Vercel auto-deploys
+#
+# NOTE: GitHub file size limit = 100 MB.
+#       PWABuilder TWA APKs are typically 3–8 MB.
+#       If APK exceeds limit, use Git LFS or GitHub Releases.
