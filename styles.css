@@ -258,8 +258,10 @@
     .tag-adj  { background:rgba(251,146,60,.14); color:var(--accent-adj); }
     .tag-other{ background:rgba(196,181,253,.14); color:var(--accent-primary); }
     .card-kanji-wrap { text-align:center; }
-    ruby { ruby-align:center; display:inline; }
-    ruby rt { font-family:'Noto Sans JP',sans-serif; font-size:.54em; font-weight:400; color:var(--accent-primary); letter-spacing:.04em; opacity:.85; }
+    /* [FIX v2.7.4] iOS Safari: ganti display:inline → display:ruby agar ruby layout proper;
+       tambah ruby-position:over + -webkit-ruby-position:before untuk posisi furigana di atas */
+    ruby { ruby-align:center; display:ruby; ruby-position:over; -webkit-ruby-position:before; }
+    ruby rt { display:ruby-text; font-family:'Noto Sans JP',sans-serif; font-size:.54em; font-weight:400; color:var(--accent-primary); letter-spacing:.04em; opacity:.85; line-height:1; }
     /* Furigana inline parens style */
     /* [FIX v2.7.3] iOS: font-size .78em terlalu besar dengan Hiragino fallback → kecilkan ke .65em,
        tambah Hiragino ke font stack supaya metrics konsisten, cegah iOS auto-scale span */
@@ -269,7 +271,7 @@
     body.romaji-off .card-romaji  { display:none; }
     body.romaji-off .reibun-romaji { display:none; }
     /* FRONT card */
-    .card-main-text { font-family:'Noto Sans JP',sans-serif; font-size:40px; font-weight:800; color:var(--text-primary); line-height:1.25; text-align:center; letter-spacing:.02em; }
+    .card-main-text { font-family:'Noto Sans JP',sans-serif; font-size:40px; font-weight:800; color:var(--text-primary); line-height:2; text-align:center; letter-spacing:.02em; }
     .card-hint-mazii { position:absolute; bottom:14px; font-size:11px; color:var(--text-muted); letter-spacing:.06em; font-weight:400; }
     /* BACK card elements */
     .cb-furigana { font-family:'Noto Sans JP',sans-serif; font-size:22px; font-weight:600; color:var(--text-primary); text-align:center; }
