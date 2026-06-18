@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<!--
+  MNN Learning — Offline Fallback Page
+  Rawliet.ID / FrameProject
+  Shown by the Service Worker when the user is offline
+  and no cached version of the requested page exists.
+-->
+<html lang="id" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <meta name="theme-color" content="#0f0f14" />
+  <title>Offline — MNN Learning</title>
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-base:      #0f0f14;
+      --bg-card:      #1a1a24;
+      --bg-elevated:  #1e1e2e;
+      --border:       rgba(255,255,255,.08);
+      --border-strong:rgba(255,255,255,.13);
+      --text-primary: #e8e8f0;
+      --text-secondary:#a0a0b8;
+      --text-muted:   #64648a;
+      --accent:       #a78bfa;
+      --accent-soft:  rgba(167,139,250,.12);
+      --accent-border:rgba(167,139,250,.25);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100dvh;
+      padding: 24px;
+      gap: 0;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-strong);
+      border-radius: 28px;
+      padding: 40px 32px 36px;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,.4);
+      animation: fadeUp .4s cubic-bezier(.34,1.56,.64,1);
+    }
+
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(24px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+
+    /* ── Icon ── */
+    .offline-icon {
+      width: 80px; height: 80px;
+      margin: 0 auto 20px;
+      background: var(--accent-soft);
+      border: 1.5px solid var(--accent-border);
+      border-radius: 22px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 40px;
+    }
+
+    /* ── Text ── */
+    .offline-title {
+      font-size: 22px; font-weight: 800;
+      color: var(--text-primary);
+      margin-bottom: 10px;
+    }
+
+    .offline-jp {
+      font-family: 'Noto Sans JP', sans-serif;
+      font-size: 13px; font-weight: 400;
+      color: var(--accent);
+      margin-bottom: 14px;
+      letter-spacing: .02em;
+    }
+
+    .offline-desc {
+      font-size: 14px; color: var(--text-secondary);
+      line-height: 1.65; margin-bottom: 28px;
+    }
+
+    /* ── Button ── */
+    .retry-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 8px;
+      width: 100%; padding: 14px 20px;
+      border-radius: 14px; border: none;
+      background: linear-gradient(135deg, #a78bfa, #f472b6);
+      color: #fff; font-family: 'DM Sans', sans-serif;
+      font-size: 15px; font-weight: 700;
+      cursor: pointer; transition: opacity .2s, transform .15s;
+    }
+    .retry-btn:hover  { opacity: .92; }
+    .retry-btn:active { transform: scale(.97); }
+
+    /* ── Cached badge ── */
+    .cached-note {
+      margin-top: 20px;
+      font-size: 12px; color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .cached-note a {
+      color: var(--accent); text-decoration: none; font-weight: 600;
+    }
+    .cached-note a:hover { text-decoration: underline; }
+
+    /* ── Footer ── */
+    .offline-footer {
+      margin-top: 32px;
+      font-size: 11px; color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="offline-icon">📶</div>
+
+    <h1 class="offline-title">Tidak ada koneksi</h1>
+    <p class="offline-jp">オフラインです</p>
+
+    <p class="offline-desc">
+      Kamu sedang offline dan halaman ini belum tersimpan
+      di cache. Periksa koneksi internet lalu coba lagi.
+    </p>
+
+    <button class="retry-btn" onclick="window.location.reload()">
+      🔄 Coba lagi
+    </button>
+
+    <p class="cached-note">
+      Konten pembelajaran yang sudah pernah dibuka tetap
+      bisa diakses. <a href="./">Buka beranda →</a>
+    </p>
+  </div>
+
+  <p class="offline-footer">MNN Learning — みんなの日本語 · Rawliet.ID</p>
+</body>
+</html>

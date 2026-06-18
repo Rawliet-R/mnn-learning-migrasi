@@ -867,6 +867,21 @@
       }
       .header { padding: 16px 32px; }
       .header-inner { max-width: 760px; margin: 0 auto; }
+
+      /* ── Profile sheet: centered modal on desktop, not bottom sheet ── */
+      .profile-sheet {
+        align-items: center;
+        justify-content: center;
+      }
+      .profile-sheet-panel {
+        width: 480px;
+        max-width: 92vw;
+        max-height: 88vh;
+        overflow-y: auto;
+        border-radius: 24px;
+        animation: fadeInUp .22s cubic-bezier(.34,1.56,.64,1);
+      }
+      .profile-sheet-handle { display: none; }
     }
 
     /* Theme icon toggle */

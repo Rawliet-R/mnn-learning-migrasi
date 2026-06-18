@@ -1,24 +1,35 @@
 /**
- * Project Name : SSW PM / MNN
- * Account Tag  : [Animeme.id]
- * Email        : [Animememe.id2@gmail.com]
- * Date         : 2026-06-06
- * Version      : v6 (feat: controlled update flow — SKIP_WAITING via postMessage)
+ * Project   : MNN Learning — みんなの日本語
+ * Brand     : Rawliet.ID / FrameProject
+ * SW Version: v7  (feat: SWR for JS/CSS, Cache-First for images,
+ *                        offline.html fallback, helper refactor)
+ * Cache     : minna-v23
+ *
+ * Caching strategy matrix:
+ *   HTML / navigation  → Network First  + offline.html fallback
+ *   JS / CSS           → Stale While Revalidate
+ *   Images / Fonts     → Cache First
+ *   CDN (Firebase/etc) → Cache First
+ *   Firebase API calls → Pass-through (never intercepted)
  */
-// ══════════════════════════════════════════
-// みんなの日本語 PWA — Service Worker v6
-// ══════════════════════════════════════════
-const CACHE = 'minna-v22';  // v3.0 — hosting portability pass: Vercel /api function, migration-notice.js added to cache
+
+// ═══════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════
+const CACHE       = 'minna-v23';
+const OFFLINE_URL = './offline.html';
 
 const LOCAL_ASSETS = [
   './',
   './index.html',
+  './offline.html',           // ← offline fallback page
   './styles.css',
   './data.js',
   './app.js',
   './features.js',
   './verb_engine.js',
   './grammar_validator.js',
+  './sentence_engine.js',
   './manifest.json',
   './master_kotoba.json',
   './migration-notice.js',
@@ -27,7 +38,7 @@ const LOCAL_ASSETS = [
   './icons/icon-152.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  // JFT Basic Full Simulation — integration layer + engine (verbatim)
+  // JFT Basic Full Simulation
   './jft_simulation.js',
   './jft_simulation/exam_engine_v9.js',
   './jft_simulation/exam_files/SSWPM_mnn_jft_data[inoyamanaka495@gmail.com][20260613]_v10_kanji_kotoba.json',
@@ -36,6 +47,7 @@ const LOCAL_ASSETS = [
   './jft_simulation/exam_files/SSWPM_mnn_jft_data[inoyamanaka495@gmail.com][20260613]_v10_dokkai.json',
 ];
 
+// CDN origins that get Cache-First treatment
 const CDN_PREFIXES = [
   'https://www.gstatic.com/firebasejs/',
   'https://fonts.googleapis.com/',
@@ -43,29 +55,106 @@ const CDN_PREFIXES = [
   'https://unpkg.com/',
 ];
 
+// Firebase API hostnames — ALWAYS pass-through, never cache
+const FIREBASE_HOSTS = [
+  'firestore.googleapis.com',
+  'firebase.googleapis.com',
+  'identitytoolkit.googleapis.com',
+  'securetoken.googleapis.com',
+];
+
+// ═══════════════════════════════════════════════════════════
+// STRATEGY HELPERS
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * Network First — try network, fall back to cache then offline.html.
+ * Used for: HTML / navigation requests.
+ */
+async function networkFirst(req) {
+  try {
+    const res = await fetch(req);
+    if (res && res.status === 200) {
+      const cache = await caches.open(CACHE);
+      cache.put(req, res.clone());
+    }
+    return res;
+  } catch (_) {
+    const cached = await caches.match(req);
+    if (cached) return cached;
+    const offline = await caches.match(OFFLINE_URL);
+    return offline || new Response('<h1>Offline</h1>', {
+      status: 503,
+      headers: { 'Content-Type': 'text/html' }
+    });
+  }
+}
+
+/**
+ * Stale While Revalidate — serve cached copy immediately,
+ * simultaneously fetch fresh copy and update cache in background.
+ * Used for: JS and CSS files.
+ */
+function staleWhileRevalidate(req) {
+  return caches.open(CACHE).then(cache =>
+    cache.match(req).then(cached => {
+      // Background network fetch (always fired — updates cache silently)
+      const networkFetch = fetch(req).then(res => {
+        if (res && res.ok) cache.put(req, res.clone());
+        return res;
+      }).catch(() => null);
+
+      // Return cached copy immediately; fall back to awaiting the network
+      return cached || networkFetch;
+    })
+  );
+}
+
+/**
+ * Cache First — serve from cache, fall back to network then cache result.
+ * Used for: images, fonts, CDN assets.
+ */
+async function cacheFirst(req) {
+  const cached = await caches.match(req);
+  if (cached) return cached;
+
+  try {
+    const res = await fetch(req);
+    if (res && (res.ok || res.type === 'opaque')) {
+      const cache = await caches.open(CACHE);
+      cache.put(req, res.clone());
+    }
+    return res;
+  } catch (_) {
+    return new Response('', { status: 408 });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// LIFECYCLE
+// ═══════════════════════════════════════════════════════════
+
 // ── Install ──
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(async cache => {
-      // Cache only local assets during install.
-      // CDN assets (Firebase SDK, fonts) are cached on-demand in the fetch handler.
-      await cache.addAll(LOCAL_ASSETS);
-      // NOTE: skipWaiting() intentionally removed from install.
-      // New SW waits in 'installed' state until user approves update via toast.
-      // Main thread posts { type: 'SKIP_WAITING' } → triggers this SW to activate.
-    })
+    caches.open(CACHE)
+      .then(cache => cache.addAll(LOCAL_ASSETS))
+      // NOTE: skipWaiting() intentionally removed.
+      // New SW waits until user confirms via the in-app update toast.
+      // Main thread posts { type: 'SKIP_WAITING' } to trigger activation.
   );
 });
 
-// ── Activate ──
+// ── Activate ── clean up ALL old caches
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys =>
+        Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+      )
       .then(() => self.clients.claim())
       .then(() => {
-        // Broadcast SW_ACTIVATED so index.html knows the new SW is live.
-        // Used to trigger a safe single reload after user approves update.
+        // Notify all open tabs that the new SW is live
         self.clients.matchAll({ type: 'window' }).then(clients =>
           clients.forEach(c => c.postMessage({ type: 'SW_ACTIVATED' }))
         );
@@ -73,71 +162,56 @@ self.addEventListener('activate', e => {
   );
 });
 
-// ── Message handler — controlled update ──
-// Main thread sends { type: 'SKIP_WAITING' } only when user confirms update.
-// This replaces the old self.skipWaiting() in install, preventing surprise reloads.
+// ── Message — controlled update ──
+// Main thread sends { type: 'SKIP_WAITING' } only when user taps "Perbarui".
 self.addEventListener('message', e => {
   if (e.data && e.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
 });
 
-// ── Fetch ──
+// ═══════════════════════════════════════════════════════════
+// FETCH — strategy dispatch
+// ═══════════════════════════════════════════════════════════
 self.addEventListener('fetch', e => {
   const req = e.request;
 
-  // Lewatkan non-GET, chrome-extension, dan Firebase/Firestore API calls
+  // ── Guard: only handle GET ──
   if (req.method !== 'GET') return;
+
   const url = new URL(req.url);
+
+  // ── Guard: skip chrome-extension ──
   if (url.protocol === 'chrome-extension:') return;
 
-  // JANGAN intercept Firebase API calls — biarkan langsung ke network
-  if (
-    url.hostname.includes('firestore.googleapis.com') ||
-    url.hostname.includes('firebase.googleapis.com') ||
-    url.hostname.includes('identitytoolkit.googleapis.com') ||
-    url.hostname.includes('securetoken.googleapis.com')
-  ) return;
+  // ── Guard: skip Firebase/Firestore API — pass straight to network ──
+  if (FIREBASE_HOSTS.some(h => url.hostname.includes(h))) return;
 
-  // CDN & static assets → cache-first
-  const isCDN    = CDN_PREFIXES.some(p => req.url.startsWith(p));
-  const isStatic = ['image', 'font', 'script', 'style'].includes(req.destination);
-
-  if (isCDN || isStatic) {
-    e.respondWith(
-      caches.match(req).then(cached => {
-        if (cached) return cached;
-        return fetch(req).then(r => {
-          if (!r || (!r.ok && r.type !== 'opaque')) return r;
-          // ── FIX: clone() SEBELUM r dikonsumsi ──
-          const toCache = r.clone();
-          caches.open(CACHE).then(c => c.put(req, toCache));
-          return r;
-        }).catch(() => new Response('', { status: 408 }));
-      })
-    );
+  // ── CDN assets (Firebase SDK, Google Fonts, unpkg) → Cache First ──
+  if (CDN_PREFIXES.some(p => req.url.startsWith(p))) {
+    e.respondWith(cacheFirst(req));
     return;
   }
 
-  // HTML / navigation → network-first, fallback ke cache
+  // ── Navigation / HTML pages → Network First + offline fallback ──
   if (req.destination === 'document' || req.mode === 'navigate') {
-    e.respondWith(
-      fetch(req).then(r => {
-        if (!r || r.status !== 200) return r;
-        // ── FIX: clone() SEBELUM r dikonsumsi ──
-        const toCache = r.clone();
-        caches.open(CACHE).then(c => c.put(req, toCache));
-        return r;
-      }).catch(() =>
-        caches.match(req).then(cached =>
-          cached || caches.match('./index.html')
-        )
-      )
-    );
+    e.respondWith(networkFirst(req));
     return;
   }
 
-  // Semua request lain → network only (tidak di-cache)
-  // Explicit pass-through prevents SW from silently swallowing requests.
-  // Without respondWith here, the browser falls back to network anyway — this is explicit.
+  // ── Scripts & Stylesheets → Stale While Revalidate ──
+  if (req.destination === 'script' || req.destination === 'style') {
+    e.respondWith(staleWhileRevalidate(req));
+    return;
+  }
+
+  // ── Images & Fonts → Cache First ──
+  if (req.destination === 'image' || req.destination === 'font') {
+    e.respondWith(cacheFirst(req));
+    return;
+  }
+
+  // ── Everything else → pass-through (no SW interception) ──
+  // Explicit non-respondWith here means browser falls back to network.
+  // This prevents the SW silently swallowing unknown request types.
 });

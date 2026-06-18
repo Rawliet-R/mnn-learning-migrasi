@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<!--
+  MNN Learning — APK Download Page
+  Route  : /download
+  File   : download.html
+  Rawliet.ID / FrameProject
+
+  UPDATE WORKFLOW:
+  1. Replace /apk/mnn-learning-latest.apk with the new APK binary
+  2. Bump "version" in package.json  →  version badge updates automatically
+  3. Update RELEASE_NOTES array below with changelog
+  4. Commit & push → Vercel auto-deploys
+-->
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0f0f14" />
+  <meta name="description" content="Download MNN Learning APK — Belajar bahasa Jepang di Android" />
+  <title>Download — MNN Learning</title>
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-base:       #0f0f14;
+      --bg-card:       #1a1a24;
+      --bg-elevated:   #1e1e2e;
+      --border:        rgba(255,255,255,.08);
+      --border-strong: rgba(255,255,255,.14);
+      --text-primary:  #e8e8f0;
+      --text-secondary:#a0a0b8;
+      --text-muted:    #64648a;
+      --accent:        #a78bfa;
+      --accent-pink:   #f472b6;
+      --accent-soft:   rgba(167,139,250,.1);
+      --accent-border: rgba(167,139,250,.22);
+      --green:         #34d399;
+      --green-soft:    rgba(52,211,153,.1);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg-base);
+      color: var(--text-primary);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Nav ── */
+    .nav {
+      position: sticky; top: 0; z-index: 100;
+      padding: 14px 20px;
+      background: rgba(15,15,20,.88);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-brand {
+      display: flex; align-items: center; gap: 10px;
+      text-decoration: none; color: var(--text-primary);
+    }
+    .nav-icon {
+      width: 32px; height: 32px; border-radius: 8px; overflow: hidden;
+      flex-shrink: 0;
+    }
+    .nav-icon img { width: 100%; height: 100%; object-fit: cover; }
+    .nav-title { font-size: 15px; font-weight: 700; }
+    .nav-open-btn {
+      padding: 8px 16px; border-radius: 10px; border: none;
+      background: var(--accent-soft); color: var(--accent);
+      font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+      cursor: pointer; text-decoration: none; transition: background .2s;
+    }
+    .nav-open-btn:hover { background: rgba(167,139,250,.18); }
+
+    /* ── Main layout ── */
+    main {
+      flex: 1;
+      max-width: 680px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 40px 20px 80px;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      text-align: center;
+      margin-bottom: 36px;
+      animation: fadeUp .45s cubic-bezier(.34,1.56,.64,1);
+    }
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(20px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+
+    .app-icon-wrap {
+      width: 96px; height: 96px;
+      margin: 0 auto 20px;
+      border-radius: 22px; overflow: hidden;
+      box-shadow: 0 8px 32px rgba(167,139,250,.25);
+      border: 2px solid var(--accent-border);
+    }
+    .app-icon-wrap img { width: 100%; height: 100%; object-fit: cover; }
+
+    .hero-title {
+      font-size: 28px; font-weight: 800;
+      background: linear-gradient(135deg, #a78bfa, #f472b6);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 6px;
+    }
+    .hero-jp {
+      font-family: 'Noto Sans JP', sans-serif;
+      font-size: 14px; color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+    .hero-desc {
+      font-size: 15px; color: var(--text-secondary);
+      line-height: 1.65; max-width: 440px; margin: 0 auto;
+    }
+
+    /* ── Version badge ── */
+    .version-row {
+      display: flex; align-items: center; justify-content: center;
+      gap: 8px; margin: 20px 0 0;
+    }
+    .version-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 12px; border-radius: 99px;
+      background: var(--green-soft); border: 1px solid rgba(52,211,153,.25);
+      color: var(--green); font-size: 12px; font-weight: 700;
+    }
+    .version-date {
+      font-size: 12px; color: var(--text-muted);
+    }
+
+    /* ── Download card ── */
+    .download-card {
+      background: var(--bg-elevated);
+      border: 1.5px solid var(--accent-border);
+      border-radius: 24px;
+      padding: 28px 24px;
+      margin-bottom: 20px;
+      animation: fadeUp .5s .08s cubic-bezier(.34,1.56,.64,1) both;
+    }
+
+    .dl-card-header {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 20px;
+    }
+    .dl-card-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: var(--accent-soft); border: 1px solid var(--accent-border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0;
+    }
+    .dl-card-title { font-size: 17px; font-weight: 800; color: var(--text-primary); }
+    .dl-card-sub   { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+    /* Requirements list */
+    .req-list {
+      list-style: none;
+      display: flex; flex-wrap: wrap; gap: 8px;
+      margin-bottom: 22px;
+    }
+    .req-item {
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 10px; border-radius: 8px;
+      background: var(--bg-card); border: 1px solid var(--border-strong);
+      font-size: 12px; font-weight: 600; color: var(--text-secondary);
+    }
+
+    /* Download button */
+    .dl-btn {
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px;
+      width: 100%; padding: 16px 24px;
+      border-radius: 16px; border: none;
+      background: linear-gradient(135deg, #a78bfa, #f472b6);
+      color: #fff;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 17px; font-weight: 800;
+      cursor: pointer; text-decoration: none;
+      transition: opacity .2s, transform .15s;
+      box-shadow: 0 8px 28px rgba(167,139,250,.3);
+    }
+    .dl-btn:hover  { opacity: .92; text-decoration: none; color: #fff; }
+    .dl-btn:active { transform: scale(.98); }
+
+    .dl-btn-icon { font-size: 22px; }
+    .dl-btn-text { display: flex; flex-direction: column; text-align: left; }
+    .dl-btn-main { font-size: 17px; font-weight: 800; }
+    .dl-btn-hint { font-size: 11px; font-weight: 400; opacity: .8; }
+
+    .dl-note {
+      margin-top: 12px;
+      font-size: 12px; color: var(--text-muted);
+      text-align: center; line-height: 1.6;
+    }
+    .dl-note a { color: var(--accent); text-decoration: none; }
+    .dl-note a:hover { text-decoration: underline; }
+
+    /* ── Info cards ── */
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+      animation: fadeUp .5s .14s cubic-bezier(.34,1.56,.64,1) both;
+    }
+    .info-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-strong);
+      border-radius: 16px; padding: 16px;
+    }
+    .info-card-icon { font-size: 20px; margin-bottom: 8px; }
+    .info-card-title { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+    .info-card-text  { font-size: 12px; color: var(--text-secondary); line-height: 1.55; }
+
+    /* ── Release notes ── */
+    .release-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-strong);
+      border-radius: 20px;
+      padding: 24px;
+      animation: fadeUp .5s .2s cubic-bezier(.34,1.56,.64,1) both;
+    }
+    .release-title {
+      font-size: 15px; font-weight: 800;
+      color: var(--text-primary); margin-bottom: 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .release-version-tag {
+      font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 99px;
+      background: var(--accent-soft); color: var(--accent);
+    }
+    .release-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .release-item {
+      display: flex; gap: 10px; align-items: flex-start;
+      font-size: 13px; color: var(--text-secondary); line-height: 1.55;
+    }
+    .release-item-dot {
+      flex-shrink: 0; width: 20px; height: 20px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; margin-top: 1px;
+    }
+    .dot-feat { background: rgba(167,139,250,.15); }
+    .dot-fix  { background: rgba(52,211,153,.15); }
+    .dot-perf { background: rgba(251,146,60,.15); }
+
+    /* ── Install steps ── */
+    .steps-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-strong);
+      border-radius: 20px; padding: 24px;
+      margin-top: 20px;
+      animation: fadeUp .5s .26s cubic-bezier(.34,1.56,.64,1) both;
+    }
+    .steps-title {
+      font-size: 14px; font-weight: 800;
+      color: var(--text-primary); margin-bottom: 16px;
+    }
+    .step-list { display: flex; flex-direction: column; gap: 12px; }
+    .step-item  {
+      display: flex; gap: 12px; align-items: flex-start;
+      font-size: 13px; color: var(--text-secondary); line-height: 1.55;
+    }
+    .step-num {
+      flex-shrink: 0; width: 24px; height: 24px; border-radius: 8px;
+      background: var(--accent-soft); border: 1px solid var(--accent-border);
+      color: var(--accent); font-size: 12px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      margin-top: 1px;
+    }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 20px;
+      text-align: center;
+      font-size: 12px; color: var(--text-muted);
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    /* ── Responsive ── */
+    @media (max-width: 480px) {
+      .hero-title { font-size: 24px; }
+      .info-grid { grid-template-columns: 1fr; }
+      main { padding: 28px 16px 60px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ NAV ══ -->
+<nav class="nav">
+  <a class="nav-brand" href="/">
+    <div class="nav-icon">
+      <img src="./icons/icon-128.png" alt="MNN" />
+    </div>
+    <span class="nav-title">MNN Learning</span>
+  </a>
+  <a class="nav-open-btn" href="/">Buka Aplikasi</a>
+</nav>
+
+<!-- ══ MAIN ══ -->
+<main>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="app-icon-wrap">
+      <img src="./icons/icon-512.png" alt="MNN Learning Icon" />
+    </div>
+    <h1 class="hero-title">MNN Learning</h1>
+    <p class="hero-jp">みんなの日本語 — Buku I & II</p>
+    <p class="hero-desc">
+      Belajar bahasa Jepang lengkap dengan flashcard, kuis, simulasi JFT Basic,
+      dan AI Sensei — tersedia offline di Android.
+    </p>
+    <div class="version-row">
+      <span class="version-badge" id="version-badge">✦ memuat versi…</span>
+      <span class="version-date" id="release-date"></span>
+    </div>
+  </section>
+
+  <!-- Download card -->
+  <div class="download-card">
+    <div class="dl-card-header">
+      <div class="dl-card-icon">📱</div>
+      <div>
+        <div class="dl-card-title">Android APK</div>
+        <div class="dl-card-sub">Trusted Web Activity (TWA) · Android 7.0+</div>
+      </div>
+    </div>
+
+    <ul class="req-list">
+      <li class="req-item">⚡ Android 7.0+</li>
+      <li class="req-item">🌐 Chrome 80+</li>
+      <li class="req-item">💾 ~5 MB</li>
+      <li class="req-item">🔒 Izinkan "sumber tidak dikenal"</li>
+    </ul>
+
+    <!-- Direct APK download — always points to latest -->
+    <a
+      class="dl-btn"
+      href="/apk/mnn-learning-latest.apk"
+      download="MNN-Learning-latest.apk"
+      id="dl-btn"
+    >
+      <span class="dl-btn-icon">⬇️</span>
+      <span class="dl-btn-text">
+        <span class="dl-btn-main">Download APK</span>
+        <span class="dl-btn-hint">mnn-learning-latest.apk</span>
+      </span>
+    </a>
+
+    <p class="dl-note">
+      APK ini dibuat dengan <strong>PWABuilder</strong> dari domain
+      <strong>rawliet-app.uk</strong>.<br />
+      Butuh bantuan?
+      <a href="https://wa.me/628999999999" target="_blank" rel="noopener">Hubungi admin →</a>
+    </p>
+  </div>
+
+  <!-- Info grid -->
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="info-card-icon">📶</div>
+      <div class="info-card-title">Offline Ready</div>
+      <div class="info-card-text">Semua konten belajar tersedia tanpa internet setelah dibuka sekali</div>
+    </div>
+    <div class="info-card">
+      <div class="info-card-icon">🔥</div>
+      <div class="info-card-title">50 Pelajaran</div>
+      <div class="info-card-text">Minna no Nihongo Buku I & II — 2.356 kosakata lengkap</div>
+    </div>
+    <div class="info-card">
+      <div class="info-card-icon">🤖</div>
+      <div class="info-card-title">AI Sensei</div>
+      <div class="info-card-text">Tanya jawab bahasa Jepang dengan AI berbasis OpenRouter</div>
+    </div>
+    <div class="info-card">
+      <div class="info-card-icon">📝</div>
+      <div class="info-card-title">Simulasi JFT</div>
+      <div class="info-card-text">Latihan ujian JFT Basic lengkap dengan moji, dokkai & choukai</div>
+    </div>
+  </div>
+
+  <!-- Release notes
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       UPDATE WORKFLOW: edit RELEASE_NOTES array di
+       bawah setiap kali rilis versi baru.
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <div class="release-card">
+    <div class="release-title">
+      📋 Release Notes
+      <span class="release-version-tag" id="release-version-tag">v…</span>
+    </div>
+    <ul class="release-list" id="release-list">
+      <!-- Rendered by JS below -->
+    </ul>
+  </div>
+
+  <!-- Install guide -->
+  <div class="steps-card">
+    <div class="steps-title">📖 Cara Install APK</div>
+    <div class="step-list">
+      <div class="step-item">
+        <div class="step-num">1</div>
+        <div>Tap tombol <strong>Download APK</strong> di atas — file akan tersimpan di folder Downloads.</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">2</div>
+        <div>Buka file manager → Downloads → tap <strong>MNN-Learning-latest.apk</strong>.</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">3</div>
+        <div>Jika muncul peringatan "sumber tidak dikenal", pilih <strong>Izinkan dari sumber ini</strong> untuk browser kamu.</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">4</div>
+        <div>Tap <strong>Install</strong> → selesai! Ikon MNN Learning akan muncul di launcher.</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">5</div>
+        <div><strong>Update:</strong> cukup download APK terbaru dan install di atas versi lama — data tidak akan terhapus.</div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ══ FOOTER ══ -->
+<footer>
+  <p>
+    MNN Learning · みんなの日本語 · <strong>Rawliet.ID</strong><br />
+    <a href="/">Buka versi web</a> ·
+    <a href="https://rawliet-app.uk" target="_blank" rel="noopener">rawliet-app.uk</a>
+  </p>
+</footer>
+
+<script>
+  // ═══════════════════════════════════════════════════
+  // RELEASE NOTES — edit array ini setiap rilis baru
+  // ═══════════════════════════════════════════════════
+  var RELEASE_NOTES = [
+    // Format: { type: 'feat'|'fix'|'perf', text: '...' }
+    { type: 'feat', text: 'Migrasi ke Vercel + domain rawliet-app.uk sebagai host utama' },
+    { type: 'feat', text: 'Halaman download APK terpusat di /download' },
+    { type: 'feat', text: 'Service Worker v7 — strategi cache diperbarui (SWR untuk JS/CSS, Cache-First untuk gambar)' },
+    { type: 'feat', text: 'Halaman offline.html — fallback saat koneksi tidak tersedia' },
+    { type: 'fix',  text: 'Profil melebar di layar PC — tidak lagi terpotong di viewport besar' },
+    { type: 'fix',  text: 'manifest.json — icon purpose dipisah (any & maskable), tambah field id' },
+    { type: 'perf', text: 'Pembersihan cache otomatis saat SW baru aktif — tidak ada cache menumpuk' },
+  ];
+
+  var RELEASE_DATE = '18 Juni 2026';
+
+  // Icon mapping
+  var TYPE_ICON  = { feat: '✨', fix: '🐛', perf: '⚡' };
+  var TYPE_CLASS = { feat: 'dot-feat', fix: 'dot-fix', perf: 'dot-perf' };
+
+  // ── Render release notes ──
+  var list = document.getElementById('release-list');
+  RELEASE_NOTES.forEach(function(n) {
+    var li = document.createElement('li');
+    li.className = 'release-item';
+    li.innerHTML =
+      '<span class="release-item-dot ' + (TYPE_CLASS[n.type] || 'dot-feat') + '">' +
+        (TYPE_ICON[n.type] || '•') +
+      '</span>' +
+      '<span>' + n.text + '</span>';
+    list.appendChild(li);
+  });
+
+  // ── Date ──
+  var dateEl = document.getElementById('release-date');
+  if (dateEl) dateEl.textContent = RELEASE_DATE;
+
+  // ── Version: fetch from package.json ──
+  fetch('/package.json')
+    .then(function(r) { return r.json(); })
+    .then(function(pkg) {
+      var v = 'v' + (pkg.version || '?');
+      var badge = document.getElementById('version-badge');
+      var tag   = document.getElementById('release-version-tag');
+      if (badge) badge.textContent = '✦ ' + v;
+      if (tag)   tag.textContent   = v;
+      // Also update download button hint
+      var hint = document.querySelector('.dl-btn-hint');
+      if (hint) hint.textContent = 'mnn-learning-' + v + '.apk';
+    })
+    .catch(function() {
+      var badge = document.getElementById('version-badge');
+      if (badge) badge.textContent = '✦ MNN Learning';
+    });
+
+  // ── Track download click (optional analytics hook) ──
+  var dlBtn = document.getElementById('dl-btn');
+  if (dlBtn) {
+    dlBtn.addEventListener('click', function() {
+      console.log('[MNN] APK download initiated');
+      // Add analytics tracking here if needed
+    });
+  }
+</script>
+
+</body>
+</html>
