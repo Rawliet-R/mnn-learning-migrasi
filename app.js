@@ -92,7 +92,7 @@ window.DB = DB;
 const PROGRESS_SYNC = (() => {
     'use strict';
 
-    // Keys yang di-backup ke Firestore
+    // Keys yang di-backup ke Firestore (scalar / JSON strings)
     const KEYS = [
         'mnn_learned',
         'mnn_gamify',
@@ -103,6 +103,13 @@ const PROGRESS_SYNC = (() => {
         'mnn_kanji_hafal',
         'mnn_calendar_v1',
         'mnn_review_v1',
+        // [CLOUD_SAVE v3.0] tambahan keys
+        'mnn_sessions_v1',
+        'mnn_jft_sim_done',
+        'mnn_book',
+        'mnn_lesson',
+        'mnn_daily_challenge',
+        'mnn_ex_diff',
     ];
 
     let _pushTimer = null;
@@ -117,7 +124,7 @@ const PROGRESS_SYNC = (() => {
             ? AUTH.user.uid : null;
     }
 
-    // Kumpulkan semua progress dari localStorage
+    // Kumpulkan semua progress dari localStorage (scalar keys)
     function _collectProgress() {
         const p = { updated: new Date().toISOString() };
         KEYS.forEach(k => {
@@ -126,6 +133,20 @@ const PROGRESS_SYNC = (() => {
                 if (v !== null) p[k.replace(/[^a-zA-Z0-9]/g, '_')] = v; // store as raw JSON string
             } catch(e) {}
         });
+        // [CLOUD_SAVE v3.0] Kumpulkan dynamic-key groups sebagai JSON objek
+        try {
+            const favs = {}, skips = {}, renshu = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (!k) continue;
+                if (k.startsWith('kfav_'))          favs[k.slice(5)]    = '1';
+                else if (k.startsWith('roadmap_skip_')) skips[k.slice(13)]  = '1';
+                else if (k.startsWith('mnn_renshu_'))  renshu[k.slice(11)] = localStorage.getItem(k);
+            }
+            if (Object.keys(favs).length)   p['_kfav']          = JSON.stringify(favs);
+            if (Object.keys(skips).length)  p['_roadmap_skips'] = JSON.stringify(skips);
+            if (Object.keys(renshu).length) p['_renshu']        = JSON.stringify(renshu);
+        } catch(e) {}
         return p;
     }
 
@@ -144,11 +165,31 @@ const PROGRESS_SYNC = (() => {
         }, DEBOUNCE_MS);
     }
 
+    // [CLOUD_SAVE v3.0] Migrasi paksa localStorage → Firestore (dipanggil jika Firestore kosong)
+    function _migrateToCloud() {
+        const db = _getDb();
+        const uid = _getUid();
+        if (!db || !uid) return;
+        const progress = _collectProgress();
+        // Hanya migrate jika ada data (lebih dari sekedar field 'updated')
+        if (Object.keys(progress).length <= 1) return;
+        db.collection('users').doc(uid)
+            .set({ progress }, { merge: true })
+            .then(() => console.log('[PROGRESS_SYNC] Auto-migration localStorage→Firestore selesai:', Object.keys(progress).length - 1, 'keys'))
+            .catch(e => console.warn('[PROGRESS_SYNC] Auto-migration failed:', e.message));
+    }
+
     // Pull dari Firestore → localStorage (dipanggil saat login)
-    // Hanya overwrite localStorage jika key kosong atau Firestore lebih baru
+    // Jika Firestore kosong tapi localStorage ada → migrasikan otomatis ke Firestore
     function pull(firestoreData) {
         if (!firestoreData || !firestoreData.progress) {
-            console.log('[PROGRESS_SYNC] No cloud progress found — using localStorage as-is');
+            console.log('[PROGRESS_SYNC] Firestore kosong — cek localStorage untuk auto-migration');
+            // Auto-migrate jika localStorage punya data
+            const hasLocal = KEYS.some(k => { try { return localStorage.getItem(k) !== null; } catch(e){ return false; } });
+            if (hasLocal) {
+                console.log('[PROGRESS_SYNC] localStorage ada — migrasikan ke Firestore');
+                _migrateToCloud();
+            }
             return false;
         }
         const p = firestoreData.progress;
@@ -176,6 +217,45 @@ const PROGRESS_SYNC = (() => {
                 // Jika keduanya ada dan bukan learned, biarkan localStorage (lebih fresh)
             } catch(e) {}
         });
+
+        // [CLOUD_SAVE v3.0] Restore dynamic-key groups
+        // Favorites (kfav_*)
+        if (p['_kfav']) {
+            try {
+                const favs = JSON.parse(p['_kfav']);
+                Object.keys(favs).forEach(id => {
+                    try { localStorage.setItem('kfav_' + id, '1'); } catch(e) {}
+                });
+                restored++;
+                console.log('[PROGRESS_SYNC] Restored favorites:', Object.keys(favs).length);
+            } catch(e) {}
+        }
+        // Roadmap skips (roadmap_skip_*)
+        if (p['_roadmap_skips']) {
+            try {
+                const skips = JSON.parse(p['_roadmap_skips']);
+                Object.keys(skips).forEach(id => {
+                    try { localStorage.setItem('roadmap_skip_' + id, '1'); } catch(e) {}
+                });
+                restored++;
+                console.log('[PROGRESS_SYNC] Restored roadmap skips:', Object.keys(skips).length);
+            } catch(e) {}
+        }
+        // Renshu best scores (mnn_renshu_*)
+        if (p['_renshu']) {
+            try {
+                const renshu = JSON.parse(p['_renshu']);
+                Object.entries(renshu).forEach(([k, v]) => {
+                    try {
+                        // Hanya tulis jika localStorage kosong (jangan overwrite yg lebih fresh)
+                        if (!localStorage.getItem('mnn_renshu_' + k)) localStorage.setItem('mnn_renshu_' + k, v);
+                    } catch(e) {}
+                });
+                restored++;
+                console.log('[PROGRESS_SYNC] Restored renshu scores:', Object.keys(renshu).length);
+            } catch(e) {}
+        }
+
         if (restored > 0) {
             console.log('[PROGRESS_SYNC] Pulled', restored, 'keys from Firestore cloud backup');
             // Reload STATE dari localStorage yang sudah diupdate
@@ -4672,6 +4752,8 @@ function toggleKotobaFav(v) {
         const k = kotobaFavKey(v);
         if (localStorage.getItem(k)) localStorage.removeItem(k);
         else localStorage.setItem(k, '1');
+        // [CLOUD_SAVE v3.0] sync favorites ke Firestore
+        try { if (window.PROGRESS_SYNC) window.PROGRESS_SYNC.push(); } catch(e) {}
     } catch(e) {}
 }
 function getAllFavIds() {
@@ -5829,6 +5911,8 @@ function renshuSaveBest(mode, score, total) {
         const pct  = total ? Math.round((score / total) * 100) : 0;
         if (!prev || pct > prev.pct) {
             localStorage.setItem(k, JSON.stringify({ score, total, pct }));
+            // [CLOUD_SAVE v3.0] sync renshu score ke Firestore
+            try { if (window.PROGRESS_SYNC) window.PROGRESS_SYNC.push(); } catch(e) {}
         }
     } catch(e) {}
 }

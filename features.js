@@ -1685,6 +1685,8 @@ const ROADMAP_MODULE = (() => {
     }
     if (!confirm(`Yakin menandai "${stepTitle}" sebagai selesai?`)) return;
     try { localStorage.setItem('roadmap_skip_' + stepId, '1'); } catch(e) {}
+    // [CLOUD_SAVE v3.0] sync roadmap progress ke Firestore
+    try { if (window.PROGRESS_SYNC) window.PROGRESS_SYNC.push(); } catch(e) {}
     render();
     // FIX v2.6.1: Refresh achievements after roadmap step completion
     if (typeof GAMIFY !== 'undefined' && GAMIFY.trackActivity) GAMIFY.trackActivity();

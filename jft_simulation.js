@@ -116,6 +116,8 @@ async function initJFTExamPage() {
         console.log('[MNN x JFT] Simulasi selesai:', results);
         // Simpan flag JFT selesai untuk Roadmap Progress
         try { localStorage.setItem('mnn_jft_sim_done', '1'); } catch(e) {}
+        // [CLOUD_SAVE v3.0] sync JFT progress ke Firestore
+        try { if (window.PROGRESS_SYNC) window.PROGRESS_SYNC.push(); } catch(e) {}
         // Refresh roadmap jika tersedia
         if (typeof ROADMAP_MODULE !== 'undefined' && ROADMAP_MODULE.render) {
           setTimeout(ROADMAP_MODULE.render, 200);
