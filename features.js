@@ -1230,7 +1230,10 @@ const CALENDAR = (() => {
   function _load() {
     try { const r = localStorage.getItem(SK); if (r) _data = JSON.parse(r); } catch(e) {}
   }
-  function _save() { try { localStorage.setItem(SK, JSON.stringify(_data)); } catch(e) {} }
+  function _save() {
+    try { localStorage.setItem(SK, JSON.stringify(_data)); } catch(e) {}
+    try { if (window.PROGRESS_SYNC) window.PROGRESS_SYNC.push(); } catch(e) {}
+  }
 
   function TODAY() { return new Date().toISOString().slice(0,10); }
 
@@ -1307,7 +1310,10 @@ const REVIEW_QUEUE = (() => {
   function _load() {
     try { const r = localStorage.getItem(SK); if (r) _queue = JSON.parse(r); } catch(e) {}
   }
-  function _save() { try { localStorage.setItem(SK, JSON.stringify(_queue)); } catch(e) {} }
+  function _save() {
+    try { localStorage.setItem(SK, JSON.stringify(_queue)); } catch(e) {}
+    try { if (window.PROGRESS_SYNC) window.PROGRESS_SYNC.push(); } catch(e) {}
+  }
 
   function addVocab(v, difficulty) {
     _load();
@@ -1726,6 +1732,7 @@ const STATS_MODULE = (() => {
     _sessions.push({ type, ts: Date.now(), date: new Date().toISOString().slice(0,10) });
     if (_sessions.length > 500) _sessions = _sessions.slice(-500);
     try { localStorage.setItem(SK_SESSIONS, JSON.stringify(_sessions)); } catch(e) {}
+    try { if (window.PROGRESS_SYNC) window.PROGRESS_SYNC.push(); } catch(e) {}
   }
 
   function logSession(type) { _saveSession(type); }

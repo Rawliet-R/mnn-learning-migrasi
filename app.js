@@ -180,12 +180,16 @@ const PROGRESS_SYNC = (() => {
     }
 
     // ── Smart merge helpers ──────────────────────────────
+    // ── union array tanpa duplikat ──────────────────────────
     function _mergeArrays(localStr, cloudStr) {
         const a = JSON.parse(localStr || '[]') || [];
         const b = JSON.parse(cloudStr || '[]') || [];
         return [...new Set([...a, ...b])];
     }
-    function _mergeObjects(localStr, cloudStr) {
+
+    // ── merge mnn_bunpou_prog: { lessonKey: { read, practiced, lastStudied } }
+    // Tiap key: ambil yang paling maju (read/practiced=true + lastStudied terbaru)
+    function _mergeBunpouProg(localStr, cloudStr) {
         const a = JSON.parse(localStr || '{}') || {};
         const b = JSON.parse(cloudStr || '{}') || {};
         const result = { ...a };
@@ -193,82 +197,172 @@ const PROGRESS_SYNC = (() => {
             if (!(k in result)) {
                 result[k] = b[k];
             } else {
-                const aVal = result[k], bVal = b[k];
-                if (aVal && bVal && typeof aVal === 'object' && typeof bVal === 'object') {
-                    if (bVal.lastStudied && aVal.lastStudied) {
-                        result[k] = bVal.lastStudied > aVal.lastStudied ? bVal : aVal;
-                    } else if (bVal.read && !aVal.read) {
-                        result[k] = bVal;
-                    }
+                const av = result[k] || {}, bv = b[k] || {};
+                result[k] = {
+                    read:      !!(av.read || bv.read),
+                    practiced: !!(av.practiced || bv.practiced),
+                    accuracy:  Math.max(Number(av.accuracy||0), Number(bv.accuracy||0)) || null,
+                    lastStudied: (av.lastStudied && bv.lastStudied)
+                        ? (av.lastStudied > bv.lastStudied ? av.lastStudied : bv.lastStudied)
+                        : (av.lastStudied || bv.lastStudied || null),
+                };
+            }
+        });
+        return result;
+    }
+
+    // ── merge mnn_kana_prog: { 'あ': { seen, correct, streak } }
+    // Tiap karakter: ambil yang punya correct lebih tinggi
+    function _mergeKanaProg(localStr, cloudStr) {
+        const a = JSON.parse(localStr || '{}') || {};
+        const b = JSON.parse(cloudStr || '{}') || {};
+        const result = { ...a };
+        Object.keys(b).forEach(k => {
+            if (!(k in result)) {
+                result[k] = b[k];
+            } else {
+                const av = result[k] || {}, bv = b[k] || {};
+                // Ambil yang correct lebih tinggi; tie → seen lebih tinggi
+                if ((bv.correct||0) > (av.correct||0) ||
+                    ((bv.correct||0) === (av.correct||0) && (bv.seen||0) > (av.seen||0))) {
+                    result[k] = bv;
                 }
             }
         });
         return result;
     }
+
+    // ── merge mnn_kana_hafal: { 'あ': true, 'い': true, ... }
+    // Union semua karakter yang sudah dihafal
+    function _mergeKanaHafal(localStr, cloudStr) {
+        const a = JSON.parse(localStr || '{}') || {};
+        const b = JSON.parse(cloudStr || '{}') || {};
+        return { ...a, ...b };
+    }
+
+    // ── merge mnn_kanji_hafal: bisa array atau object
+    function _mergeKanjiHafal(localStr, cloudStr) {
+        try {
+            const a = JSON.parse(localStr), b = JSON.parse(cloudStr);
+            if (Array.isArray(a) && Array.isArray(b)) return [...new Set([...a, ...b])];
+            if (!Array.isArray(a) && !Array.isArray(b)) return { ...a, ...b };
+            // mixed: convert ke object union
+            const ao = Array.isArray(a) ? Object.fromEntries(a.map(x => [x,true])) : a;
+            const bo = Array.isArray(b) ? Object.fromEntries(b.map(x => [x,true])) : b;
+            return { ...ao, ...bo };
+        } catch(e) { return JSON.parse(cloudStr||'{}'); }
+    }
+
+    // ── merge mnn_gamify: sesuai struktur _defaultData() di features.js
+    // { totalEXP, level, currentStreak, bestStreak, lastActiveDate,
+    //   unlockedAchievements[], selectedAvatarId,
+    //   _vocabLearned, _grammarDone, _quizDone, _bestAccuracy }
     function _mergeGamify(localStr, cloudStr) {
         const a = JSON.parse(localStr || '{}') || {};
         const b = JSON.parse(cloudStr || '{}') || {};
-        const numFields = ['totalEXP','level','currentStreak','bestStreak','_quizDone','_vocabLearned','_grammarDone','_bestAccuracy','_loginDays'];
         const result = { ...a };
-        numFields.forEach(f => {
-            result[f] = Math.max(Number(a[f] || 0), Number(b[f] || 0));
+
+        // Numerik: ambil tertinggi
+        ['totalEXP','_vocabLearned','_grammarDone','_quizDone','_bestAccuracy','bestStreak'].forEach(f => {
+            result[f] = Math.max(Number(a[f]||0), Number(b[f]||0));
         });
-        const EXP_PER_LEVEL = 100;
-        result.level = Math.max(result.level, Math.floor(result.totalEXP / EXP_PER_LEVEL) + 1);
-        if (a.achievements || b.achievements) {
-            result.achievements = [...new Set([...(a.achievements||[]), ...(b.achievements||[])])];
+
+        // Level: recalculate dari totalEXP pakai formula asli (_expForLevel(n) = n*(n-1)/2 * 100)
+        // JANGAN override — biarkan GAMIFY hitung sendiri dari totalEXP saat init
+        // Tapi pastikan minimal nilai tertinggi dari keduanya
+        result.level = Math.max(Number(a.level||1), Number(b.level||1));
+
+        // Streak: ambil yang lebih besar, lastActiveDate ambil yang lebih baru
+        result.currentStreak = Math.max(Number(a.currentStreak||0), Number(b.currentStreak||0));
+        if (a.lastActiveDate && b.lastActiveDate) {
+            result.lastActiveDate = a.lastActiveDate > b.lastActiveDate ? a.lastActiveDate : b.lastActiveDate;
+        } else {
+            result.lastActiveDate = a.lastActiveDate || b.lastActiveDate || '';
         }
-        if (a.activeDays || b.activeDays) {
-            result.activeDays = [...new Set([...(a.activeDays||[]), ...(b.activeDays||[])])].sort();
-        }
+
+        // unlockedAchievements: union array (field asli di _defaultData)
+        const aAch = a.unlockedAchievements || a.achievements || [];
+        const bAch = b.unlockedAchievements || b.achievements || [];
+        result.unlockedAchievements = [...new Set([...aAch, ...bAch])];
+        delete result.achievements; // hapus field lama yg salah nama
+
+        // selectedAvatarId: pakai local (preferensi user device ini)
+        result.selectedAvatarId = a.selectedAvatarId || b.selectedAvatarId || 'av-ninja';
+
         return result;
     }
+
+    // ── merge mnn_missions_v1: { date: 'YYYY-MM-DD', missions: [...] }
+    // Reset harian — ambil yang datenya hari ini, atau yang lebih baru
     function _mergeMissions(localStr, cloudStr) {
         const a = JSON.parse(localStr || '{}') || {};
         const b = JSON.parse(cloudStr || '{}') || {};
-        const result = { ...a };
-        if (a.completed || b.completed) {
-            result.completed = [...new Set([...(a.completed||[]), ...(b.completed||[])])];
+        const today = new Date().toISOString().slice(0,10);
+        // Kalau salah satu = hari ini, pakai itu
+        if (a.date === today && b.date !== today) return a;
+        if (b.date === today && a.date !== today) return b;
+        if (a.date === today && b.date === today) {
+            // Keduanya hari ini — merge progress per mission (ambil tertinggi)
+            const result = { date: today, missions: (a.missions || []).map((m, i) => {
+                const bm = (b.missions || [])[i] || {};
+                return {
+                    ...m,
+                    progress: Math.max(Number(m.progress||0), Number(bm.progress||0)),
+                    claimed:  !!(m.claimed || bm.claimed),
+                };
+            })};
+            return result;
         }
-        if (a.progress || b.progress) {
-            const ap = a.progress || {}, bp = b.progress || {};
-            result.progress = { ...ap };
-            Object.keys(bp).forEach(k => {
-                result.progress[k] = Math.max(Number(ap[k]||0), Number(bp[k]||0));
-            });
-        }
-        return result;
+        // Keduanya bukan hari ini: ambil yang lebih baru
+        return (a.date||'') > (b.date||'') ? a : b;
     }
+
+    // ── merge mnn_calendar_v1: { 'YYYY-MM-DD': level 0-3 }
+    // Union semua tanggal, tiap tanggal ambil level tertinggi
     function _mergeCalendar(localStr, cloudStr) {
         const a = JSON.parse(localStr || '{}') || {};
         const b = JSON.parse(cloudStr || '{}') || {};
         const result = { ...a };
-        ['activeDates','dates','streakDates'].forEach(f => {
-            if (a[f] || b[f]) {
-                const aArr = Array.isArray(a[f]) ? a[f] : Object.keys(a[f]||{});
-                const bArr = Array.isArray(b[f]) ? b[f] : Object.keys(b[f]||{});
-                if (Array.isArray(a[f])) {
-                    result[f] = [...new Set([...aArr, ...bArr])].sort();
-                } else {
-                    result[f] = { ...(a[f]||{}), ...(b[f]||{}) };
-                }
-            }
+        Object.keys(b).forEach(d => {
+            result[d] = Math.max(Number(result[d]||0), Number(b[d]||0));
         });
-        if (a.bestStreak !== undefined || b.bestStreak !== undefined) {
-            result.bestStreak = Math.max(Number(a.bestStreak||0), Number(b.bestStreak||0));
-        }
         return result;
     }
+
+    // ── merge mnn_sessions_v1: array of { type, ts, date }
+    // Gabungkan semua sesi, dedup by ts (timestamp)
     function _mergeSessions(localStr, cloudStr) {
         const a = JSON.parse(localStr || '[]') || [];
         const b = JSON.parse(cloudStr || '[]') || [];
         const seen = new Set();
         const merged = [];
         [...a, ...b].forEach(s => {
-            const key = s.date || s.timestamp || s.t || JSON.stringify(s);
+            // ts adalah unique identifier per sesi
+            const key = s.ts ? String(s.ts) : (s.date + '|' + s.type + '|' + JSON.stringify(s));
             if (!seen.has(key)) { seen.add(key); merged.push(s); }
         });
-        return merged;
+        // Jaga max 500 entries (sama dengan limit di features.js)
+        return merged.length > 500 ? merged.slice(-500) : merged;
+    }
+
+    // ── merge mnn_review_v1: array of vocab objects dengan difficulty/wrongCount
+    // Dedup by key = (kana||kanji||jp)§(arti), ambil difficulty + wrongCount tertinggi
+    function _mergeReview(localStr, cloudStr) {
+        const a = JSON.parse(localStr || '[]') || [];
+        const b = JSON.parse(cloudStr || '[]') || [];
+        const map = new Map();
+        [...a, ...b].forEach(item => {
+            const key = ((item.kana||item.kanji||item.jp||'') + '§' + (item.arti||''));
+            if (!map.has(key)) {
+                map.set(key, { ...item });
+            } else {
+                const ex = map.get(key);
+                ex.difficulty  = Math.max(Number(ex.difficulty||1), Number(item.difficulty||1));
+                ex.wrongCount  = Math.max(Number(ex.wrongCount||0), Number(item.wrongCount||0));
+                ex.addedAt     = Math.min(Number(ex.addedAt||0), Number(item.addedAt||0)) || ex.addedAt;
+            }
+        });
+        return [...map.values()];
     }
 
     // Pull dari Firestore → smart merge per tipe data → push hasil merge kembali ke Firestore
@@ -303,39 +397,25 @@ const PROGRESS_SYNC = (() => {
                         case 'mnn_missions_v1':
                             result = JSON.stringify(_mergeMissions(localVal, cloudVal)); break;
                         case 'mnn_bunpou_prog':
+                            result = JSON.stringify(_mergeBunpouProg(localVal, cloudVal)); break;
                         case 'mnn_kana_prog':
+                            result = JSON.stringify(_mergeKanaProg(localVal, cloudVal)); break;
                         case 'mnn_kana_hafal':
-                            result = JSON.stringify(_mergeObjects(localVal, cloudVal)); break;
+                            result = JSON.stringify(_mergeKanaHafal(localVal, cloudVal)); break;
                         case 'mnn_kanji_hafal':
-                            try {
-                                const a = JSON.parse(localVal), b = JSON.parse(cloudVal);
-                                result = JSON.stringify(Array.isArray(a) && Array.isArray(b)
-                                    ? [...new Set([...a, ...b])]
-                                    : { ...a, ...b });
-                            } catch(e) { result = cloudVal; }
-                            break;
+                            result = JSON.stringify(_mergeKanjiHafal(localVal, cloudVal)); break;
                         case 'mnn_calendar_v1':
                             result = JSON.stringify(_mergeCalendar(localVal, cloudVal)); break;
                         case 'mnn_sessions_v1':
                             result = JSON.stringify(_mergeSessions(localVal, cloudVal)); break;
                         case 'mnn_review_v1':
-                            try {
-                                const a = JSON.parse(localVal)||[], b = JSON.parse(cloudVal)||[];
-                                const seen = new Set();
-                                const deduped = [];
-                                [...a,...b].forEach(item => {
-                                    const key = item.id||item.key||item.k||JSON.stringify(item);
-                                    if (!seen.has(key)) { seen.add(key); deduped.push(item); }
-                                });
-                                result = JSON.stringify(deduped);
-                            } catch(e) { result = cloudVal; }
-                            break;
+                            result = JSON.stringify(_mergeReview(localVal, cloudVal)); break;
                         case 'mnn_jft_sim_done':
                             result = (localVal || cloudVal) ? '1' : null; break;
                         case 'mnn_daily_challenge':
                             try {
-                                const a = JSON.parse(localVal)||{}, b = JSON.parse(cloudVal)||{};
-                                result = JSON.stringify((b.date && a.date && b.date > a.date) ? b : a);
+                                const dcA = JSON.parse(localVal)||{}, dcB = JSON.parse(cloudVal)||{};
+                                result = JSON.stringify((dcB.date && dcA.date && dcB.date > dcA.date) ? dcB : dcA);
                             } catch(e) { result = cloudVal; }
                             break;
                         default:
@@ -3098,6 +3178,8 @@ function initKanjiHafal() {
 }
 function saveKanjiHafal() {
     try { localStorage.setItem('mnn_kanji_hafal', JSON.stringify([...KANJI_STATE.hafal])); } catch(e) {}
+    // [CLOUD_SAVE] sync kanji hafal ke Firestore
+    try { if (window.PROGRESS_SYNC) window.PROGRESS_SYNC.push(); } catch(e) {}
 }
 
 function filterKanjiCards() {
