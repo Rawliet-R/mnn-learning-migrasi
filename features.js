@@ -259,6 +259,8 @@ const GAMIFY = (() => {
 
   function _save() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(_d)); } catch(e) {}
+    // [PROGRESS_SYNC v2.7.4]
+    try { if (window.PROGRESS_SYNC) window.PROGRESS_SYNC.push(); } catch(e) {}
   }
 
   function _load() {
@@ -1077,7 +1079,11 @@ const MISSIONS = (() => {
     }
   }
 
-  function _save() { try { localStorage.setItem(SK, JSON.stringify(_data)); } catch(e) {} }
+  function _save() {
+    try { localStorage.setItem(SK, JSON.stringify(_data)); } catch(e) {}
+    // [PROGRESS_SYNC v2.7.4]
+    try { if (window.PROGRESS_SYNC) window.PROGRESS_SYNC.push(); } catch(e) {}
+  }
 
   function incrementProgress(type, amount) {
     if (!_data) _load();

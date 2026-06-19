@@ -45,6 +45,8 @@ const STATE = {
             localStorage.setItem('mnn_daily_challenge', JSON.stringify(this.dailyChallenge));
             localStorage.setItem('mnn_ex_diff', this.exDifficulty); // [SENTENCE_ENGINE]
         } catch(e){}
+        // [PROGRESS_SYNC v2.7.4] backup ke Firestore setiap kali STATE disimpan
+        try { if (window.PROGRESS_SYNC) window.PROGRESS_SYNC.push(); } catch(e) {}
     },
     load() {
         try {
@@ -80,6 +82,124 @@ const STATE = {
 window.STATE = STATE;
 // FIX v2.6.4: const DB tidak otomatis jadi window.DB — roadmap steps pakai window.DB
 window.DB = DB;
+
+// ═══════════════════════════════════════════════════════════
+// PROGRESS_SYNC — Firestore cloud backup untuk semua progress
+// [FIX v2.7.4] Root cause: localStorage domain-specific →
+// ganti domain (Netlify→rawliet-app.uk) = semua progress hilang.
+// Solusi: sync progress ke Firestore users/{uid}.progress
+// ═══════════════════════════════════════════════════════════
+const PROGRESS_SYNC = (() => {
+    'use strict';
+
+    // Keys yang di-backup ke Firestore
+    const KEYS = [
+        'mnn_learned',
+        'mnn_gamify',
+        'mnn_missions_v1',
+        'mnn_bunpou_prog',
+        'mnn_kana_prog',
+        'mnn_kana_hafal',
+        'mnn_kanji_hafal',
+        'mnn_calendar_v1',
+        'mnn_review_v1',
+    ];
+
+    let _pushTimer = null;
+    const DEBOUNCE_MS = 6000; // 6 detik debounce supaya tidak spam Firestore
+
+    function _getDb() {
+        return (typeof _fbDb !== 'undefined' && _fbDb) ? _fbDb : null;
+    }
+
+    function _getUid() {
+        return (window.AUTH && AUTH.user && !AUTH.user.isGuest && AUTH.user.uid)
+            ? AUTH.user.uid : null;
+    }
+
+    // Kumpulkan semua progress dari localStorage
+    function _collectProgress() {
+        const p = { updated: new Date().toISOString() };
+        KEYS.forEach(k => {
+            try {
+                const v = localStorage.getItem(k);
+                if (v !== null) p[k.replace(/[^a-zA-Z0-9]/g, '_')] = v; // store as raw JSON string
+            } catch(e) {}
+        });
+        return p;
+    }
+
+    // Push ke Firestore (debounced)
+    function push() {
+        clearTimeout(_pushTimer);
+        _pushTimer = setTimeout(() => {
+            const db = _getDb();
+            const uid = _getUid();
+            if (!db || !uid) return;
+            const progress = _collectProgress();
+            db.collection('users').doc(uid)
+                .set({ progress }, { merge: true })
+                .then(() => console.log('[PROGRESS_SYNC] Pushed to Firestore:', Object.keys(progress).length - 1, 'keys'))
+                .catch(e => console.warn('[PROGRESS_SYNC] Push failed:', e.message));
+        }, DEBOUNCE_MS);
+    }
+
+    // Pull dari Firestore → localStorage (dipanggil saat login)
+    // Hanya overwrite localStorage jika key kosong atau Firestore lebih baru
+    function pull(firestoreData) {
+        if (!firestoreData || !firestoreData.progress) {
+            console.log('[PROGRESS_SYNC] No cloud progress found — using localStorage as-is');
+            return false;
+        }
+        const p = firestoreData.progress;
+        let restored = 0;
+        KEYS.forEach(k => {
+            const fsKey = k.replace(/[^a-zA-Z0-9]/g, '_');
+            if (!p[fsKey]) return;
+            try {
+                const local = localStorage.getItem(k);
+                // Tulis dari Firestore jika localStorage kosong
+                // Untuk mnn_learned: merge (union) supaya tidak ada yang hilang
+                if (k === 'mnn_learned' && local) {
+                    try {
+                        const localArr = JSON.parse(local) || [];
+                        const cloudArr = JSON.parse(p[fsKey]) || [];
+                        const merged = [...new Set([...localArr, ...cloudArr])];
+                        localStorage.setItem(k, JSON.stringify(merged));
+                        restored++;
+                        console.log('[PROGRESS_SYNC] Merged mnn_learned:', merged.length, 'words');
+                    } catch(e) { localStorage.setItem(k, p[fsKey]); restored++; }
+                } else if (!local) {
+                    localStorage.setItem(k, p[fsKey]);
+                    restored++;
+                }
+                // Jika keduanya ada dan bukan learned, biarkan localStorage (lebih fresh)
+            } catch(e) {}
+        });
+        if (restored > 0) {
+            console.log('[PROGRESS_SYNC] Pulled', restored, 'keys from Firestore cloud backup');
+            // Reload STATE dari localStorage yang sudah diupdate
+            try { if (window.STATE) window.STATE.load(); } catch(e) {}
+        }
+        return restored > 0;
+    }
+
+    // Immediate push tanpa debounce (untuk logout)
+    function pushNow() {
+        clearTimeout(_pushTimer);
+        const db = _getDb();
+        const uid = _getUid();
+        if (!db || !uid) return;
+        const progress = _collectProgress();
+        db.collection('users').doc(uid)
+            .set({ progress }, { merge: true })
+            .then(() => console.log('[PROGRESS_SYNC] pushNow complete'))
+            .catch(e => console.warn('[PROGRESS_SYNC] pushNow failed:', e.message));
+    }
+
+    return { push, pull, pushNow };
+})();
+window.PROGRESS_SYNC = PROGRESS_SYNC;
 
 // ═══════════════════════════════════════════════════════════
 // DATA HELPERS
@@ -3913,6 +4033,8 @@ const AUTH = {
     // Logout via Firebase (or clear guest)
     logout() {
         clearTimeout(window._profileAuthTimer); // FIX: clear profile-sheet loading timer if mid-auth
+        // [PROGRESS_SYNC v2.7.4] simpan progress sebelum logout
+        try { if (window.PROGRESS_SYNC) window.PROGRESS_SYNC.pushNow(); } catch(e) {}
         if (window._guestMode) {
             window._guestMode = false;
             try { localStorage.removeItem('mnn_guest'); } catch(e) {}
@@ -4072,6 +4194,12 @@ _fbAuth.onAuthStateChanged(async fbUser => {
                     try { localStorage.setItem('mnn_member_id', data.memberId); } catch(e) {}
                     console.log('[MEMBER_ID] Loaded from Firestore on auth:', data.memberId);
                 }
+                // [PROGRESS_SYNC v2.7.4] Restore progress dari Firestore cloud backup
+                // Ini fix untuk progress hilang saat ganti domain / device baru
+                try {
+                    const restored = PROGRESS_SYNC.pull(data);
+                    if (restored) console.log('[PROGRESS_SYNC] Progress restored from cloud backup');
+                } catch(psErr) { console.warn('[PROGRESS_SYNC] pull error:', psErr.message); }
             } else {
                 console.warn('[AUTH] FIRESTORE FETCH DONE — doc not found, isPremium = false');
                 console.log('[FIRESTORE_SOURCE_OF_TRUTH] Doc not found — writing isPremium: false | uid:', fbUser.uid);
