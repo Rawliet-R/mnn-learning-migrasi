@@ -4137,6 +4137,9 @@ const AUTH = {
 
 // ════════════════════════════════════════════════════════
 // onAuthStateChanged — Splash Gate + single source of truth
+// [FIX] Expose AUTH ke window supaya PROGRESS_SYNC._getUid() bisa akses
+window.AUTH = AUTH;
+
 // ════════════════════════════════════════════════════════
 // ── AUTH STATE MACHINE ─────────────────────────────────
 // "loading"         → Firebase onAuthStateChanged has NOT fired yet
