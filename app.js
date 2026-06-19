@@ -1282,7 +1282,7 @@ function renderBunpou() {
         const lines = p.split('\n');
 
         // STRUKTUR: title + first non-example line
-        const strukturDesc = lines.filter(l => !l.match(/例[:：]/) && l.trim()).slice(0,2).join('<br>') || '—';
+        const strukturDesc = lines.filter(l => !l.match(/例[:：]/) && l.trim()).slice(0,2).join('\n') || '—';
         const struktur = `<div style="margin-bottom:8px"><span style="font-family:'Noto Sans JP',sans-serif;font-size:15px;font-weight:700;background:rgba(196,181,253,.12);padding:3px 10px;border-radius:7px;color:var(--accent-primary)">${addFuriganaToGrammarTitle(title.replace(/[（(][^)）]*[)）]/g,'').trim())}</span></div><div>${addFuriganaToText(strukturDesc).replace(/\n/g,'<br>')}</div>`;
 
         // FUNGSI: extract main explanation (lines before first 例:)
