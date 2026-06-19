@@ -179,12 +179,102 @@ const PROGRESS_SYNC = (() => {
             .catch(e => console.warn('[PROGRESS_SYNC] Auto-migration failed:', e.message));
     }
 
-    // Pull dari Firestore → localStorage (dipanggil saat login)
-    // Jika Firestore kosong tapi localStorage ada → migrasikan otomatis ke Firestore
+    // ── Smart merge helpers ──────────────────────────────
+    function _mergeArrays(localStr, cloudStr) {
+        const a = JSON.parse(localStr || '[]') || [];
+        const b = JSON.parse(cloudStr || '[]') || [];
+        return [...new Set([...a, ...b])];
+    }
+    function _mergeObjects(localStr, cloudStr) {
+        const a = JSON.parse(localStr || '{}') || {};
+        const b = JSON.parse(cloudStr || '{}') || {};
+        const result = { ...a };
+        Object.keys(b).forEach(k => {
+            if (!(k in result)) {
+                result[k] = b[k];
+            } else {
+                const aVal = result[k], bVal = b[k];
+                if (aVal && bVal && typeof aVal === 'object' && typeof bVal === 'object') {
+                    if (bVal.lastStudied && aVal.lastStudied) {
+                        result[k] = bVal.lastStudied > aVal.lastStudied ? bVal : aVal;
+                    } else if (bVal.read && !aVal.read) {
+                        result[k] = bVal;
+                    }
+                }
+            }
+        });
+        return result;
+    }
+    function _mergeGamify(localStr, cloudStr) {
+        const a = JSON.parse(localStr || '{}') || {};
+        const b = JSON.parse(cloudStr || '{}') || {};
+        const numFields = ['totalEXP','level','currentStreak','bestStreak','_quizDone','_vocabLearned','_grammarDone','_bestAccuracy','_loginDays'];
+        const result = { ...a };
+        numFields.forEach(f => {
+            result[f] = Math.max(Number(a[f] || 0), Number(b[f] || 0));
+        });
+        const EXP_PER_LEVEL = 100;
+        result.level = Math.max(result.level, Math.floor(result.totalEXP / EXP_PER_LEVEL) + 1);
+        if (a.achievements || b.achievements) {
+            result.achievements = [...new Set([...(a.achievements||[]), ...(b.achievements||[])])];
+        }
+        if (a.activeDays || b.activeDays) {
+            result.activeDays = [...new Set([...(a.activeDays||[]), ...(b.activeDays||[])])].sort();
+        }
+        return result;
+    }
+    function _mergeMissions(localStr, cloudStr) {
+        const a = JSON.parse(localStr || '{}') || {};
+        const b = JSON.parse(cloudStr || '{}') || {};
+        const result = { ...a };
+        if (a.completed || b.completed) {
+            result.completed = [...new Set([...(a.completed||[]), ...(b.completed||[])])];
+        }
+        if (a.progress || b.progress) {
+            const ap = a.progress || {}, bp = b.progress || {};
+            result.progress = { ...ap };
+            Object.keys(bp).forEach(k => {
+                result.progress[k] = Math.max(Number(ap[k]||0), Number(bp[k]||0));
+            });
+        }
+        return result;
+    }
+    function _mergeCalendar(localStr, cloudStr) {
+        const a = JSON.parse(localStr || '{}') || {};
+        const b = JSON.parse(cloudStr || '{}') || {};
+        const result = { ...a };
+        ['activeDates','dates','streakDates'].forEach(f => {
+            if (a[f] || b[f]) {
+                const aArr = Array.isArray(a[f]) ? a[f] : Object.keys(a[f]||{});
+                const bArr = Array.isArray(b[f]) ? b[f] : Object.keys(b[f]||{});
+                if (Array.isArray(a[f])) {
+                    result[f] = [...new Set([...aArr, ...bArr])].sort();
+                } else {
+                    result[f] = { ...(a[f]||{}), ...(b[f]||{}) };
+                }
+            }
+        });
+        if (a.bestStreak !== undefined || b.bestStreak !== undefined) {
+            result.bestStreak = Math.max(Number(a.bestStreak||0), Number(b.bestStreak||0));
+        }
+        return result;
+    }
+    function _mergeSessions(localStr, cloudStr) {
+        const a = JSON.parse(localStr || '[]') || [];
+        const b = JSON.parse(cloudStr || '[]') || [];
+        const seen = new Set();
+        const merged = [];
+        [...a, ...b].forEach(s => {
+            const key = s.date || s.timestamp || s.t || JSON.stringify(s);
+            if (!seen.has(key)) { seen.add(key); merged.push(s); }
+        });
+        return merged;
+    }
+
+    // Pull dari Firestore → smart merge per tipe data → push hasil merge kembali ke Firestore
     function pull(firestoreData) {
         if (!firestoreData || !firestoreData.progress) {
             console.log('[PROGRESS_SYNC] Firestore kosong — cek localStorage untuk auto-migration');
-            // Auto-migrate jika localStorage punya data
             const hasLocal = KEYS.some(k => { try { return localStorage.getItem(k) !== null; } catch(e){ return false; } });
             if (hasLocal) {
                 console.log('[PROGRESS_SYNC] localStorage ada — migrasikan ke Firestore');
@@ -193,75 +283,113 @@ const PROGRESS_SYNC = (() => {
             return false;
         }
         const p = firestoreData.progress;
-        let restored = 0;
+        let merged = 0;
+
         KEYS.forEach(k => {
             const fsKey = k.replace(/[^a-zA-Z0-9]/g, '_');
-            if (!p[fsKey]) return;
+            const cloudVal = p[fsKey];
+            const localVal = localStorage.getItem(k);
+            if (!cloudVal) return;
             try {
-                const local = localStorage.getItem(k);
-                // Tulis dari Firestore jika localStorage kosong
-                // Untuk mnn_learned: merge (union) supaya tidak ada yang hilang
-                if (k === 'mnn_learned' && local) {
-                    try {
-                        const localArr = JSON.parse(local) || [];
-                        const cloudArr = JSON.parse(p[fsKey]) || [];
-                        const merged = [...new Set([...localArr, ...cloudArr])];
-                        localStorage.setItem(k, JSON.stringify(merged));
-                        restored++;
-                        console.log('[PROGRESS_SYNC] Merged mnn_learned:', merged.length, 'words');
-                    } catch(e) { localStorage.setItem(k, p[fsKey]); restored++; }
-                } else if (!local) {
-                    localStorage.setItem(k, p[fsKey]);
-                    restored++;
+                let result;
+                if (!localVal) {
+                    result = cloudVal;
+                } else {
+                    switch(k) {
+                        case 'mnn_learned':
+                            result = JSON.stringify(_mergeArrays(localVal, cloudVal)); break;
+                        case 'mnn_gamify':
+                            result = JSON.stringify(_mergeGamify(localVal, cloudVal)); break;
+                        case 'mnn_missions_v1':
+                            result = JSON.stringify(_mergeMissions(localVal, cloudVal)); break;
+                        case 'mnn_bunpou_prog':
+                        case 'mnn_kana_prog':
+                        case 'mnn_kana_hafal':
+                            result = JSON.stringify(_mergeObjects(localVal, cloudVal)); break;
+                        case 'mnn_kanji_hafal':
+                            try {
+                                const a = JSON.parse(localVal), b = JSON.parse(cloudVal);
+                                result = JSON.stringify(Array.isArray(a) && Array.isArray(b)
+                                    ? [...new Set([...a, ...b])]
+                                    : { ...a, ...b });
+                            } catch(e) { result = cloudVal; }
+                            break;
+                        case 'mnn_calendar_v1':
+                            result = JSON.stringify(_mergeCalendar(localVal, cloudVal)); break;
+                        case 'mnn_sessions_v1':
+                            result = JSON.stringify(_mergeSessions(localVal, cloudVal)); break;
+                        case 'mnn_review_v1':
+                            try {
+                                const a = JSON.parse(localVal)||[], b = JSON.parse(cloudVal)||[];
+                                const seen = new Set();
+                                const deduped = [];
+                                [...a,...b].forEach(item => {
+                                    const key = item.id||item.key||item.k||JSON.stringify(item);
+                                    if (!seen.has(key)) { seen.add(key); deduped.push(item); }
+                                });
+                                result = JSON.stringify(deduped);
+                            } catch(e) { result = cloudVal; }
+                            break;
+                        case 'mnn_jft_sim_done':
+                            result = (localVal || cloudVal) ? '1' : null; break;
+                        case 'mnn_daily_challenge':
+                            try {
+                                const a = JSON.parse(localVal)||{}, b = JSON.parse(cloudVal)||{};
+                                result = JSON.stringify((b.date && a.date && b.date > a.date) ? b : a);
+                            } catch(e) { result = cloudVal; }
+                            break;
+                        default:
+                            result = cloudVal;
+                    }
                 }
-                // Jika keduanya ada dan bukan learned, biarkan localStorage (lebih fresh)
-            } catch(e) {}
+                if (result && result !== localVal) {
+                    localStorage.setItem(k, result);
+                    merged++;
+                }
+            } catch(e) { console.warn('[PROGRESS_SYNC] merge error', k, e.message); }
         });
 
-        // [CLOUD_SAVE v3.0] Restore dynamic-key groups
-        // Favorites (kfav_*)
+        // Dynamic groups — union semua
         if (p['_kfav']) {
             try {
-                const favs = JSON.parse(p['_kfav']);
-                Object.keys(favs).forEach(id => {
-                    try { localStorage.setItem('kfav_' + id, '1'); } catch(e) {}
-                });
-                restored++;
-                console.log('[PROGRESS_SYNC] Restored favorites:', Object.keys(favs).length);
+                const cloudFavs = JSON.parse(p['_kfav']);
+                Object.keys(cloudFavs).forEach(id => { try { localStorage.setItem('kfav_' + id, '1'); } catch(e) {} });
+                merged++;
+                console.log('[PROGRESS_SYNC] Merged favorites:', Object.keys(cloudFavs).length);
             } catch(e) {}
         }
-        // Roadmap skips (roadmap_skip_*)
         if (p['_roadmap_skips']) {
             try {
-                const skips = JSON.parse(p['_roadmap_skips']);
-                Object.keys(skips).forEach(id => {
-                    try { localStorage.setItem('roadmap_skip_' + id, '1'); } catch(e) {}
-                });
-                restored++;
-                console.log('[PROGRESS_SYNC] Restored roadmap skips:', Object.keys(skips).length);
+                const cloudSkips = JSON.parse(p['_roadmap_skips']);
+                Object.keys(cloudSkips).forEach(id => { try { localStorage.setItem('roadmap_skip_' + id, '1'); } catch(e) {} });
+                merged++;
+                console.log('[PROGRESS_SYNC] Merged roadmap skips:', Object.keys(cloudSkips).length);
             } catch(e) {}
         }
-        // Renshu best scores (mnn_renshu_*)
         if (p['_renshu']) {
             try {
-                const renshu = JSON.parse(p['_renshu']);
-                Object.entries(renshu).forEach(([k, v]) => {
+                const cloudRenshu = JSON.parse(p['_renshu']);
+                Object.entries(cloudRenshu).forEach(([k, cloudScore]) => {
                     try {
-                        // Hanya tulis jika localStorage kosong (jangan overwrite yg lebih fresh)
-                        if (!localStorage.getItem('mnn_renshu_' + k)) localStorage.setItem('mnn_renshu_' + k, v);
+                        const localScore = localStorage.getItem('mnn_renshu_' + k);
+                        if (!localScore) {
+                            localStorage.setItem('mnn_renshu_' + k, cloudScore);
+                        } else {
+                            const lp = JSON.parse(localScore)||{}, cp = JSON.parse(cloudScore)||{};
+                            if ((cp.pct||0) > (lp.pct||0)) localStorage.setItem('mnn_renshu_' + k, cloudScore);
+                        }
                     } catch(e) {}
                 });
-                restored++;
-                console.log('[PROGRESS_SYNC] Restored renshu scores:', Object.keys(renshu).length);
+                merged++;
+                console.log('[PROGRESS_SYNC] Merged renshu scores:', Object.keys(cloudRenshu).length);
             } catch(e) {}
         }
 
-        if (restored > 0) {
-            console.log('[PROGRESS_SYNC] Pulled', restored, 'keys from Firestore cloud backup');
-            // Reload STATE dari localStorage yang sudah diupdate
-            try { if (window.STATE) window.STATE.load(); } catch(e) {}
-        }
-        return restored > 0;
+        console.log('[PROGRESS_SYNC] Smart merge selesai —', merged, 'keys diupdate');
+        try { if (window.STATE) window.STATE.load(); } catch(e) {}
+        // Push hasil merge ke Firestore supaya semua device sinkron
+        setTimeout(() => { try { push(); } catch(e) {} }, 1500);
+        return merged > 0;
     }
 
     // Immediate push tanpa debounce (untuk logout)
