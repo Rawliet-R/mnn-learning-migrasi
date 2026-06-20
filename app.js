@@ -2080,10 +2080,8 @@ function openChapterFromDashboard(idx) {
 // SUB TABS (Materi page)
 // ═══════════════════════════════════════════════════════════
 function switchSubTab(tab) {
-    // AI tab is disabled — Coming Soon
-    if (tab === 'ai') return;
     STATE.currentTab = tab;
-    ['flashcard','kosakata','bunpou','ai','renshu'].forEach(t => {
+    ['flashcard','kosakata','bunpou','renshu'].forEach(t => {
         const el = document.getElementById('tab-' + t);
         if (el) el.style.display = t === tab ? '' : 'none';
     });
@@ -2096,7 +2094,6 @@ function switchSubTab(tab) {
         renderBunpou();
     }
     if (tab === 'kosakata') renderVocabList(document.getElementById('filter-input')?.value || '');
-    if (tab === 'ai') updateAiContext();
     if (tab === 'renshu') renderRenshuHome();
 }
 
