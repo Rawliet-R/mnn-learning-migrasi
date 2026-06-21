@@ -23,8 +23,18 @@ const AI_SENSEI = (() => {
 
     const FREE_CREDITS_MONTHLY   = 20;
     const PREMIUM_CREDITS_MONTHLY = 200;
-    const MODEL = 'openai/gpt-4o-mini';
+    const MODEL = 'google/gemini-2.0-flash-lite';
     const MAX_HISTORY_TURNS = 6; // simpan 6 pasang user+assistant
+
+    // Biaya credit per fitur
+    const FEATURE_COSTS = {
+        'interview':  5,
+        'roleplay':   3,
+        'koreksi':    2,
+        'bunpou':     1,
+        'kotoba':     1,
+        'default':    1,
+    };
 
     // ── State chat ──
     let _chatHistory  = [];   // [{role, content}, ...]
@@ -216,30 +226,27 @@ const AI_SENSEI = (() => {
      * Menggunakan FieldValue.increment(-1) agar atomic.
      * Return: sisa kredit baru
      */
-    async function deductCredit() {
+    async function deductCredit(amount = 1) {
         const ref = _userRef();
         if (!ref) return 0;
+        const safeAmount = Math.max(1, Math.floor(amount));
         try {
-            // atomic decrement — tidak akan negatif karena sudah dicek sebelumnya
             await ref.set({
-                aiCredits: _increment(-1),
-                aiUsage:   _increment(1),
+                aiCredits: _increment(-safeAmount),
+                aiUsage:   _increment(safeAmount),
             }, { merge: true });
-
             if (_creditsCache) {
-                _creditsCache.used      = (_creditsCache.used || 0) + 1;
-                _creditsCache.remaining = Math.max(0, _creditsCache.remaining - 1);
-                _creditsCache.total     = Math.max(0, (_creditsCache.total || 1) - 1);
+                _creditsCache.used      = (_creditsCache.used || 0) + safeAmount;
+                _creditsCache.remaining = Math.max(0, _creditsCache.remaining - safeAmount);
+                _creditsCache.total     = Math.max(0, (_creditsCache.total || safeAmount) - safeAmount);
             }
-
-            console.log('[AI_CREDIT] 💳 Kredit dikurangi 1. Sisa cache:', _creditsCache?.remaining);
+            console.log('[AI_CREDIT] Kredit dikurangi', safeAmount, '. Sisa:', _creditsCache?.remaining);
             return _creditsCache?.remaining ?? 0;
         } catch (e) {
-            console.error('[AI_CREDIT] ❌ deductCredit ERROR:', e.message);
-            return _creditsCache?.remaining ?? 0; // jangan block user jika gagal
+            console.error('[AI_CREDIT] deductCredit ERROR:', e.message);
+            return _creditsCache?.remaining ?? 0;
         }
     }
-
     // ─────────────────────────────────────────────────────
     // SYSTEM PROMPT — Pembelajaran Bahasa Jepang
     // ─────────────────────────────────────────────────────
@@ -319,7 +326,7 @@ const AI_SENSEI = (() => {
      * @param {string} userMessage - Pesan dari user
      * @returns {Promise<{success: boolean, answer?: string, error?: string, remaining?: number}>}
      */
-    async function ask(userMessage) {
+    async function ask(userMessage, cost = 1) {
         if (_isLoading) return { success: false, error: 'Sedang memproses, harap tunggu...' };
         if (!userMessage?.trim()) return { success: false, error: 'Pesan tidak boleh kosong.' };
 
@@ -397,8 +404,8 @@ ${
             // Tambah jawaban AI ke history
             _chatHistory.push({ role: 'assistant', content: answer });
 
-            // Kurangi kredit
-            const remaining = await deductCredit();
+            // Kurangi kredit sesuai biaya fitur
+            const remaining = await deductCredit(cost);
 
             _isLoading = false;
             return { success: true, answer, remaining };
@@ -416,6 +423,192 @@ ${
                     ? 'Koneksi gagal. Periksa internet kamu dan coba lagi.'
                     : (e.message || 'Terjadi kesalahan. Silakan coba lagi.')
             };
+        }
+    }
+
+
+    // ─────────────────────────────────────────────────────
+    // FEATURE DETECTION — deteksi jenis pertanyaan & biaya
+    // ─────────────────────────────────────────────────────
+
+    /**
+     * Deteksi fitur dari pesan user untuk menentukan biaya credit.
+     * @param {string} msg
+     * @returns {{ feature: string, cost: number }}
+     */
+    function _detectFeature(msg) {
+        const m = msg.toLowerCase();
+        if (/interview|wawancara kerja|simulasi interview/.test(m))
+            return { feature: 'Interview AI', cost: FEATURE_COSTS.interview };
+        if (/roleplay|bermain peran|simulasi percakapan|berperan sebagai|role.?play/.test(m))
+            return { feature: 'Roleplay Percakapan', cost: FEATURE_COSTS.roleplay };
+        if (/koreksi|perbaiki kalimat|betulkan|benarkan|apakah.*benar|cek kalimat/.test(m))
+            return { feature: 'Koreksi Kalimat', cost: FEATURE_COSTS.koreksi };
+        if (/bunpou|tata bahasa|pola kalimat|grammar|partikel|て.form|た.form/.test(m))
+            return { feature: 'Bunpou', cost: FEATURE_COSTS.bunpou };
+        if (/arti|kosakata|kotoba|apa artinya|translate|terjemah/.test(m))
+            return { feature: 'Kotoba', cost: FEATURE_COSTS.kotoba };
+        return { feature: 'Pertanyaan Umum', cost: FEATURE_COSTS.default };
+    }
+
+    // ─────────────────────────────────────────────────────
+    // USAGE LOG — simpan riwayat pemakaian ke Firestore
+    // ─────────────────────────────────────────────────────
+
+    /**
+     * Catat log penggunaan ke collection aiUsageLogs.
+     * Fire-and-forget — tidak block UI jika gagal.
+     */
+    async function _logUsage(feature, creditUsed) {
+        const uid = window.AUTH?.user?.uid;
+        if (!uid || typeof _fbDb === 'undefined') return;
+        try {
+            await _fbDb.collection('aiUsageLogs').add({
+                uid,
+                feature,
+                creditUsed,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+            console.log('[AI_CREDIT] Log usage:', feature, creditUsed, 'credit');
+        } catch (e) {
+            console.warn('[AI_CREDIT] _logUsage gagal (non-critical):', e.message);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────
+    // WELCOME BONUS — satu kali per akun
+    // ─────────────────────────────────────────────────────
+
+    /**
+     * Cek dan klaim bonus launch AI Sensei.
+     * Premium: +15 credit. Free: +5 credit.
+     * Hanya sekali per akun, dijaga oleh field aiWelcomeBonusClaimed.
+     * @returns {Promise<{ claimed: boolean, amount: number }>}
+     */
+    async function claimWelcomeBonus() {
+        const ref = _userRef();
+        if (!ref) return { claimed: false, amount: 0 };
+
+        try {
+            const snap = await ref.get();
+            const data = snap.exists ? snap.data() : {};
+
+            // Sudah pernah klaim → skip
+            if (data.aiWelcomeBonusClaimed === true) {
+                console.log('[AI_CREDIT] Welcome bonus sudah diklaim sebelumnya, skip.');
+                return { claimed: false, amount: 0 };
+            }
+
+            const isPrem = typeof isPremiumUser === 'function' && isPremiumUser();
+            const bonus  = isPrem ? 15 : 5;
+            const plan   = isPrem ? 'premium' : 'free';
+
+            console.log('[AI_CREDIT] Mengklaim welcome bonus:', bonus, 'credit | isPremium:', isPrem);
+
+            await ref.set({
+                aiCredits:            firebase.firestore.FieldValue.increment(bonus),
+                aiWelcomeBonusClaimed: true,
+                aiUsage:              data.aiUsage ?? 0,
+                aiPlan:               data.aiPlan  ?? plan,
+            }, { merge: true });
+
+            // Log transaksi bonus
+            await _fbDb.collection('creditTransactions').add({
+                uid:       window.AUTH.user.uid,
+                amount:    bonus,
+                type:      'welcome_bonus',
+                adminUid:  null,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+
+            // Invalidate cache agar getCredits baca ulang
+            invalidateCache();
+
+            console.log('[AI_CREDIT] Welcome bonus berhasil diklaim:', bonus, 'credit');
+            return { claimed: true, amount: bonus };
+
+        } catch (e) {
+            console.error('[AI_CREDIT] claimWelcomeBonus error:', e.message);
+            return { claimed: false, amount: 0 };
+        }
+    }
+
+    // ─────────────────────────────────────────────────────
+    // POPUP — credit tidak cukup
+    // ─────────────────────────────────────────────────────
+
+    function _showCreditPopup(needed, have) {
+        document.getElementById('ais-credit-popup')?.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'ais-credit-popup';
+        overlay.innerHTML =
+            '<div class="ais-popup-box">' +
+            '<div class="ais-popup-icon">💳</div>' +
+            '<div class="ais-popup-title">Credit Tidak Cukup</div>' +
+            '<div class="ais-popup-body">' +
+            'Kamu butuh <strong>' + needed + ' credit</strong> untuk fitur ini,<br>' +
+            'tapi sisa credit kamu <strong>' + have + ' credit</strong>.' +
+            '</div>' +
+            '<div class="ais-popup-sub">Lakukan top up credit untuk melanjutkan.</div>' +
+            '<div class="ais-popup-actions">' +
+            '<button class="ais-popup-btn-secondary" id="ais-popup-close">Tutup</button>' +
+            '<button class="ais-popup-btn-primary" id="ais-popup-topup">Top Up Credit</button>' +
+            '</div>' +
+            '</div>';
+        document.body.appendChild(overlay);
+
+        document.getElementById('ais-popup-close').onclick = () => overlay.remove();
+        document.getElementById('ais-popup-topup').onclick = () => {
+            overlay.remove();
+            if (typeof navigateTo === 'function') navigateTo('ai-credit');
+        };
+        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    }
+
+    // ─────────────────────────────────────────────────────
+    // ADMIN — tambah credit user
+    // ─────────────────────────────────────────────────────
+
+    /**
+     * Admin: tambah credit ke user lain.
+     * Hanya bisa dipanggil jika role = "admin".
+     * @param {string} targetUid
+     * @param {number} amount
+     */
+    async function adminAddCredit(targetUid, amount) {
+        if (window.AUTH?.user?.role !== 'admin') {
+            return { success: false, error: 'Hanya admin yang bisa melakukan ini.' };
+        }
+        if (!targetUid || amount <= 0) {
+            return { success: false, error: 'UID dan jumlah credit tidak valid.' };
+        }
+        if (typeof _fbDb === 'undefined') {
+            return { success: false, error: 'Firestore tidak tersedia.' };
+        }
+
+        try {
+            const targetRef = _fbDb.collection('users').doc(targetUid);
+            const snap = await targetRef.get();
+            if (!snap.exists) return { success: false, error: 'User tidak ditemukan.' };
+
+            await targetRef.set({
+                aiCredits: firebase.firestore.FieldValue.increment(amount),
+            }, { merge: true });
+
+            await _fbDb.collection('creditTransactions').add({
+                uid:       targetUid,
+                amount,
+                type:      'manual_topup',
+                adminUid:  window.AUTH.user.uid,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+
+            console.log('[ADMIN] Credit ditambahkan:', amount, '-> uid:', targetUid);
+            return { success: true };
+        } catch (e) {
+            console.error('[ADMIN] adminAddCredit error:', e.message);
+            return { success: false, error: e.message };
         }
     }
 
@@ -546,9 +739,22 @@ ${
         const msg = inp.value.trim();
         if (!msg || _isLoading) return;
 
+        // Deteksi fitur & biaya sebelum apapun
+        const { feature, cost } = _detectFeature(msg);
+
+        // Cek credit SEBELUM kirim request
+        const credits = await getCredits();
+        if (!credits.isGuest && !credits.error && credits.remaining < cost) {
+            _showCreditPopup(cost, credits.remaining);
+            return; // blok — jangan kirim ke AI
+        }
+
         inp.value = '';
         inp.style.height = 'auto';
         _setInputDisabled(true);
+
+        // Tampilkan badge biaya di atas bubble user
+        _showCostBadge(feature, cost);
 
         // Bubble user
         appendMessage('user', msg);
@@ -557,7 +763,7 @@ ${
         showLoading();
 
         // Kirim ke AI
-        const result = await ask(msg);
+        const result = await ask(msg, cost);
 
         hideLoading();
         _setInputDisabled(false);
@@ -565,11 +771,23 @@ ${
 
         if (result.success) {
             appendMessage('ai', result.answer);
+            // Log usage ke Firestore
+            await _logUsage(feature, cost);
             // Refresh kredit display
             refreshCreditDisplay();
         } else {
             appendMessage('error', result.error);
         }
+    }
+
+    /** Tampilkan badge kecil "X credit — NamaFitur" di messages */
+    function _showCostBadge(feature, cost) {
+        const container = document.getElementById('ais-messages');
+        if (!container) return;
+        const badge = document.createElement('div');
+        badge.className = 'ais-cost-badge';
+        badge.textContent = cost + ' credit - ' + feature;
+        container.appendChild(badge);
     }
 
     function _setInputDisabled(disabled) {
@@ -584,9 +802,33 @@ ${
     // INIT — dipanggil saat halaman AI Sensei dibuka
     // ─────────────────────────────────────────────────────
 
+    /** Toast selamat untuk welcome bonus */
+    function _showBonusToast(amount) {
+        const toast = document.createElement('div');
+        toast.className = 'ais-bonus-toast';
+        toast.innerHTML =
+            '<span class="ais-bonus-icon">🎁</span>' +
+            '<span>Selamat! Kamu dapat bonus <strong>' + amount + ' credit</strong> dari AI Sensei Launch!</span>';
+        document.body.appendChild(toast);
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateY(0)'; });
+        });
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 400);
+        }, 4000);
+    }
+
     function init() {
         invalidateCache();
-        refreshCreditDisplay();
+
+        // Cek & klaim welcome bonus saat pertama kali buka AI Sensei
+        claimWelcomeBonus().then(result => {
+            if (result.claimed) {
+                _showBonusToast(result.amount);
+            }
+            refreshCreditDisplay();
+        });
 
         // Setup input event: auto-resize + Enter to send
         const inp = document.getElementById('ais-input');
@@ -662,9 +904,13 @@ ${
         getCredits,
         deductCredit,
         resetChat,
+        invalidateCache,
         refreshCreditDisplay,
         appendMessage,
         handleSend,
+        claimWelcomeBonus,
+        adminAddCredit,
+        detectFeature: _detectFeature,
     };
 
 })();

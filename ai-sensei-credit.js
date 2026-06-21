@@ -1,0 +1,260 @@
+/* ═══════════════════════════════════════════════════════════
+   MNN Learning — AI Credit Page Controller
+   ai-sensei-credit.js
+
+   Tanggung jawab:
+   - Render halaman AI Credit (saldo, riwayat, paket top up)
+   - Admin tools: tambah credit manual
+   - Dipanggil saat navigateTo('ai-credit')
+   ═══════════════════════════════════════════════════════════ */
+
+'use strict';
+
+const AI_CREDIT_PAGE = (() => {
+
+    // ─────────────────────────────────────────────────────
+    // RENDER UTAMA
+    // ─────────────────────────────────────────────────────
+
+    async function render() {
+        const container = document.getElementById('aic-content');
+        const header    = document.getElementById('aic-header-balance');
+        if (!container) return;
+
+        container.innerHTML = '<div class="aic-loading-wrap"><div class="aic-spinner"></div></div>';
+
+        // Ambil data credit
+        const credits = window.AI_SENSEI
+            ? await AI_SENSEI.getCredits()
+            : { total: 0, remaining: 0, used: 0, plan: 'free', error: true };
+
+        // Update header balance
+        if (header) header.textContent = (credits.remaining ?? 0) + ' credit';
+
+        // Ambil riwayat penggunaan
+        const logs = await _fetchUsageLogs();
+
+        const isAdmin = window.AI_FLAG?.isAdmin?.() || false;
+        const isPrem  = typeof isPremiumUser === 'function' && isPremiumUser();
+
+        container.innerHTML =
+            _renderBalanceCard(credits, isPrem) +
+            _renderWelcomeBonus(credits) +
+            _renderUsageHistory(logs) +
+            _renderTopUpPackages() +
+            (isAdmin ? _renderAdminTools() : '');
+
+        _bindEvents();
+    }
+
+    // ─────────────────────────────────────────────────────
+    // FIRESTORE — ambil riwayat pemakaian
+    // ─────────────────────────────────────────────────────
+
+    async function _fetchUsageLogs() {
+        const uid = window.AUTH?.user?.uid;
+        if (!uid || typeof _fbDb === 'undefined') return [];
+        try {
+            const snap = await _fbDb.collection('aiUsageLogs')
+                .where('uid', '==', uid)
+                .orderBy('createdAt', 'desc')
+                .limit(15)
+                .get();
+            return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        } catch (e) {
+            console.warn('[AIC_PAGE] _fetchUsageLogs error:', e.message);
+            return [];
+        }
+    }
+
+    // ─────────────────────────────────────────────────────
+    // RENDER HELPERS
+    // ─────────────────────────────────────────────────────
+
+    function _renderBalanceCard(credits, isPrem) {
+        const remaining = credits.remaining ?? 0;
+        const total     = credits.total     ?? 0;
+        const used      = credits.used      ?? 0;
+        const plan      = credits.plan      ?? 'free';
+        const pct       = total > 0 ? Math.round((remaining / total) * 100) : 0;
+        const barClass  = pct <= 20 ? 'ais-credit-low' : pct <= 50 ? 'ais-credit-mid' : '';
+
+        return '<div class="aic-card aic-balance-card">' +
+            '<div class="aic-balance-num">' + remaining + '</div>' +
+            '<div class="aic-balance-label">credit tersisa</div>' +
+            '<div class="aic-balance-track">' +
+                '<div class="ais-credit-bar-fill ' + barClass + '" style="width:' + pct + '%"></div>' +
+            '</div>' +
+            '<div class="aic-balance-meta">' +
+                '<span>Terpakai: ' + used + '</span>' +
+                '<span>Plan: <strong>' + plan + '</strong></span>' +
+            '</div>' +
+        '</div>';
+    }
+
+    function _renderWelcomeBonus(credits) {
+        const uid  = window.AUTH?.user?.uid;
+        if (!uid) return '';
+        const isPrem = typeof isPremiumUser === 'function' && isPremiumUser();
+        const bonus  = isPrem ? 15 : 5;
+        // Kita tidak punya akses langsung ke field aiWelcomeBonusClaimed dari sini,
+        // tapi bisa ditampilkan statis sebagai info
+        return '<div class="aic-card aic-bonus-card">' +
+            '<div class="aic-section-title">Bonus Launch AI Sensei</div>' +
+            '<div class="aic-bonus-row">' +
+                '<span class="aic-bonus-icon">🎁</span>' +
+                '<div>' +
+                    '<div class="aic-bonus-name">Welcome Bonus</div>' +
+                    '<div class="aic-bonus-sub">1x per akun &mdash; ' + bonus + ' credit gratis</div>' +
+                '</div>' +
+                '<span class="aic-bonus-badge">Claimed</span>' +
+            '</div>' +
+        '</div>';
+    }
+
+    function _renderUsageHistory(logs) {
+        const featureIcon = { 'Interview AI': '💼', 'Roleplay Percakapan': '🎭',
+            'Koreksi Kalimat': '✏️', 'Bunpou': '📚', 'Kotoba': '📖', 'Pertanyaan Umum': '💬' };
+
+        if (!logs.length) {
+            return '<div class="aic-card">' +
+                '<div class="aic-section-title">Riwayat Penggunaan</div>' +
+                '<div class="aic-empty">Belum ada riwayat penggunaan.</div>' +
+            '</div>';
+        }
+
+        const rows = logs.map(log => {
+            const icon = featureIcon[log.feature] || '🤖';
+            const date = log.createdAt?.toDate
+                ? log.createdAt.toDate().toLocaleDateString('id-ID', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })
+                : '-';
+            return '<div class="aic-log-row">' +
+                '<span class="aic-log-icon">' + icon + '</span>' +
+                '<div class="aic-log-info">' +
+                    '<div class="aic-log-feature">' + (log.feature || 'AI Sensei') + '</div>' +
+                    '<div class="aic-log-date">' + date + '</div>' +
+                '</div>' +
+                '<span class="aic-log-cost">-' + (log.creditUsed || 1) + '</span>' +
+            '</div>';
+        }).join('');
+
+        return '<div class="aic-card">' +
+            '<div class="aic-section-title">Riwayat Penggunaan</div>' +
+            rows +
+        '</div>';
+    }
+
+    function _renderTopUpPackages() {
+        const packages = [
+            { credits: 100,  price: 'Rp5.000',  tag: '' },
+            { credits: 300,  price: 'Rp10.000', tag: 'Populer' },
+            { credits: 1000, price: 'Rp25.000', tag: 'Hemat' },
+        ];
+
+        const cards = packages.map(p =>
+            '<div class="aic-pkg-card">' +
+                (p.tag ? '<span class="aic-pkg-tag">' + p.tag + '</span>' : '') +
+                '<div class="aic-pkg-credits">' + p.credits + '</div>' +
+                '<div class="aic-pkg-label">credit</div>' +
+                '<div class="aic-pkg-price">' + p.price + '</div>' +
+                '<button class="aic-pkg-btn" onclick="AI_CREDIT_PAGE.openTopUpRequest(' + p.credits + ', \'' + p.price + '\')">' +
+                    'Pilih Paket' +
+                '</button>' +
+            '</div>'
+        ).join('');
+
+        return '<div class="aic-card">' +
+            '<div class="aic-section-title">Paket Top Up Credit</div>' +
+            '<div class="aic-pkg-note">Pembayaran manual &mdash; hubungi admin setelah memilih paket.</div>' +
+            '<div class="aic-pkg-grid">' + cards + '</div>' +
+        '</div>';
+    }
+
+    function _renderAdminTools() {
+        return '<div class="aic-card aic-admin-card">' +
+            '<div class="aic-section-title">Admin Tools</div>' +
+            '<div class="aic-admin-label">Tambah Credit ke User</div>' +
+            '<input id="aic-admin-uid" class="aic-admin-input" placeholder="UID User" autocomplete="off" spellcheck="false">' +
+            '<input id="aic-admin-amount" class="aic-admin-input" type="number" placeholder="Jumlah Credit" min="1">' +
+            '<button id="aic-admin-submit" class="aic-admin-btn">Tambah Credit</button>' +
+            '<div id="aic-admin-result" class="aic-admin-result"></div>' +
+        '</div>';
+    }
+
+    // ─────────────────────────────────────────────────────
+    // EVENT BINDING
+    // ─────────────────────────────────────────────────────
+
+    function _bindEvents() {
+        // Admin: submit tambah credit
+        const adminBtn = document.getElementById('aic-admin-submit');
+        if (adminBtn) {
+            adminBtn.addEventListener('click', async () => {
+                const uid    = document.getElementById('aic-admin-uid')?.value?.trim();
+                const amount = parseInt(document.getElementById('aic-admin-amount')?.value);
+                const result = document.getElementById('aic-admin-result');
+
+                if (!uid || !amount || amount < 1) {
+                    if (result) result.textContent = 'Isi UID dan jumlah credit dengan benar.';
+                    return;
+                }
+
+                adminBtn.disabled = true;
+                adminBtn.textContent = 'Memproses...';
+                if (result) result.textContent = '';
+
+                const res = await AI_SENSEI.adminAddCredit(uid, amount);
+
+                adminBtn.disabled = false;
+                adminBtn.textContent = 'Tambah Credit';
+
+                if (result) {
+                    result.textContent = res.success
+                        ? 'Berhasil! ' + amount + ' credit ditambahkan ke ' + uid
+                        : 'Gagal: ' + res.error;
+                    result.className = 'aic-admin-result ' + (res.success ? 'aic-admin-ok' : 'aic-admin-err');
+                }
+            });
+        }
+    }
+
+    // ─────────────────────────────────────────────────────
+    // TOP UP REQUEST — manual (belum ada payment gateway)
+    // ─────────────────────────────────────────────────────
+
+    function openTopUpRequest(credits, price) {
+        const uid = window.AUTH?.user?.uid || '-';
+        // Tampilkan instruksi manual
+        const existing = document.getElementById('aic-topup-modal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'aic-topup-modal';
+        modal.innerHTML =
+            '<div class="ais-popup-box">' +
+            '<div class="ais-popup-icon">📦</div>' +
+            '<div class="ais-popup-title">Top Up ' + credits + ' Credit</div>' +
+            '<div class="ais-popup-body">' +
+                'Harga: <strong>' + price + '</strong><br><br>' +
+                'Kirim bukti transfer ke admin dengan menyertakan:<br>' +
+                '<code style="font-size:11px;word-break:break-all;display:block;margin-top:8px;background:rgba(255,255,255,0.05);padding:8px;border-radius:8px">' +
+                    'UID: ' + uid + '<br>' +
+                    'Paket: ' + credits + ' credit (' + price + ')' +
+                '</code>' +
+            '</div>' +
+            '<div class="ais-popup-sub">Admin akan menambahkan credit setelah pembayaran dikonfirmasi.</div>' +
+            '<div class="ais-popup-actions">' +
+            '<button class="ais-popup-btn-primary" onclick="document.getElementById(\'aic-topup-modal\').remove()">Tutup</button>' +
+            '</div>' +
+            '</div>';
+        document.body.appendChild(modal);
+    }
+
+    // ─────────────────────────────────────────────────────
+    // PUBLIC
+    // ─────────────────────────────────────────────────────
+    return { render, openTopUpRequest };
+
+})();
+
+window.AI_CREDIT_PAGE = AI_CREDIT_PAGE;

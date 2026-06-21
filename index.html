@@ -1065,6 +1065,7 @@
             <div class="ais-credit-bar-fill" id="ais-credit-bar" style="width:100%"></div>
           </div>
         </div>
+        <button class="aic-header-link" onclick="navigateTo('ai-credit')" aria-label="AI Credit">💳</button>
         <button id="ais-new-chat-btn" aria-label="Mulai chat baru">+ Baru</button>
       </header>
 
@@ -1097,6 +1098,23 @@
         </button>
       </div>
 
+    </section>
+
+    <!-- AI CREDIT PAGE -->
+    <section class="page" id="page-ai-credit" role="main" aria-label="AI Credit">
+      <header class="ais-header">
+        <div class="ais-header-left">
+          <button class="aic-back-btn" onclick="navigateTo('ai-sensei')" aria-label="Kembali">&#8592;</button>
+          <div class="ais-header-info">
+            <span class="ais-header-title">AI Credit</span>
+          </div>
+        </div>
+        <div id="aic-header-balance" class="aic-header-balance">-- credit</div>
+      </header>
+      <div id="aic-content" class="aic-scroll">
+        <!-- Dirender oleh AI_CREDIT_PAGE.render() -->
+        <div class="aic-loading-wrap"><div class="aic-spinner"></div></div>
+      </div>
     </section>
 
   </main>
@@ -1219,6 +1237,8 @@
 <script src="ai-sensei-flag.js"></script>
 <!-- ══ AI Sensei Beta ══ -->
 <script src="ai-sensei.js"></script>
+<!-- ══ AI Credit Page ══ -->
+<script src="ai-sensei-credit.js"></script>
 
 </body>
 </html>

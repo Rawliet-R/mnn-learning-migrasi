@@ -6058,6 +6058,13 @@ function navigateTo(page) {
     document.querySelectorAll('.page').forEach(p => {
         p.classList.toggle('active', p.id === 'page-' + page);
     });
+    // ── AI Credit Page ──
+    if (page === 'ai-credit') {
+        requestAnimationFrame(() => {
+            if (window.AI_CREDIT_PAGE) AI_CREDIT_PAGE.render();
+        });
+    }
+
     // ── AI Sensei: feature flag + init saat halaman dibuka ──
     if (page === 'ai-sensei') {
         // Cek akses dulu sebelum render
