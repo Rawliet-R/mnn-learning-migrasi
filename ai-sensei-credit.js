@@ -276,8 +276,7 @@ const AI_CREDIT_PAGE = (() => {
             '<div class="aic-topup-price">' + price + '</div>' +
             '<div class="aic-qris-label">Scan QRIS untuk membayar</div>' +
             '<div class="aic-qris-wrap">' +
-                '<img src="/qris.jpeg" alt="QRIS Rawliet.ID" class="aic-qris-img" ' +
-                'onerror="this.parentElement.innerHTML='<div class=aic-qris-err>Gambar QRIS tidak ditemukan</div>'">' +
+                '<img src="/qris.jpeg" alt="QRIS Rawliet.ID" class="aic-qris-img">' +
             '</div>' +
             '<div class="aic-topup-memberid">MNN-ID kamu: <strong>' + memberId + '</strong></div>' +
             '<div class="aic-topup-note">Setelah bayar, tap tombol di bawah untuk konfirmasi ke admin via WhatsApp.</div>' +
