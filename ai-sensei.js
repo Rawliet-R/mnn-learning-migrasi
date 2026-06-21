@@ -347,13 +347,18 @@ ${
         ];
 
         try {
-            // Encode sebagai Blob UTF-8 — fix error ByteString untuk karakter Jepang
-            const _payload = JSON.stringify({ model: MODEL, messages });
-            const _blob    = new Blob([_payload], { type: 'application/json; charset=utf-8' });
+            // Escape semua non-ASCII ke \uXXXX agar body pure ASCII
+            // Fix: Node.js di api/ai-proxy melempar ByteString error
+            // jika body mengandung karakter Unicode (Jepang, em-dash, dll)
+            const _rawPayload = JSON.stringify({ model: MODEL, messages });
+            const _safePayload = _rawPayload.replace(
+                /[\u0080-\uFFFF]/g,
+                ch => '\\u' + ('0000' + ch.charCodeAt(0).toString(16)).slice(-4)
+            );
             const res = await fetch('/api/ai-proxy', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json; charset=utf-8' },
-                body: _blob
+                headers: { 'Content-Type': 'application/json' },
+                body: _safePayload
             });
 
             if (!res.ok) {
