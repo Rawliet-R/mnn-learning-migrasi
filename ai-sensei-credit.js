@@ -93,15 +93,18 @@ const AI_CREDIT_PAGE = (() => {
     }
 
     function _renderWelcomeBonus(credits) {
-        const uid  = window.AUTH?.user?.uid;
+        const uid      = window.AUTH?.user?.uid;
+        const memberId = window.AUTH?.user?.memberId || '-';
         if (!uid) return '';
         const isPrem = typeof isPremiumUser === 'function' && isPremiumUser();
         const bonus  = isPrem ? 15 : 5;
-        // Kita tidak punya akses langsung ke field aiWelcomeBonusClaimed dari sini,
-        // tapi bisa ditampilkan statis sebagai info
         return '<div class="aic-card aic-bonus-card">' +
-            '<div class="aic-section-title">Bonus Launch AI Sensei</div>' +
-            '<div class="aic-bonus-row">' +
+            '<div class="aic-section-title">Info Akun</div>' +
+            '<div class="aic-member-id-row">' +
+                '<span class="aic-member-label">MNN-ID kamu</span>' +
+                '<span class="aic-member-value" id="aic-member-id-val">' + memberId + '</span>' +
+            '</div>' +
+            '<div class="aic-bonus-row" style="margin-top:12px">' +
                 '<span class="aic-bonus-icon">🎁</span>' +
                 '<div>' +
                     '<div class="aic-bonus-name">Welcome Bonus</div>' +
@@ -173,8 +176,8 @@ const AI_CREDIT_PAGE = (() => {
     function _renderAdminTools() {
         return '<div class="aic-card aic-admin-card">' +
             '<div class="aic-section-title">Admin Tools</div>' +
-            '<div class="aic-admin-label">Tambah Credit ke User</div>' +
-            '<input id="aic-admin-uid" class="aic-admin-input" placeholder="UID User" autocomplete="off" spellcheck="false">' +
+            '<div class="aic-admin-label">Tambah Credit via MNN-ID</div>' +
+            '<input id="aic-admin-uid" class="aic-admin-input" placeholder="Contoh: MNN-849622" autocomplete="off" spellcheck="false" style="text-transform:uppercase">' +
             '<input id="aic-admin-amount" class="aic-admin-input" type="number" placeholder="Jumlah Credit" min="1">' +
             '<button id="aic-admin-submit" class="aic-admin-btn">Tambah Credit</button>' +
             '<div id="aic-admin-result" class="aic-admin-result"></div>' +
@@ -203,14 +206,18 @@ const AI_CREDIT_PAGE = (() => {
                 adminBtn.textContent = 'Memproses...';
                 if (result) result.textContent = '';
 
-                const res = await AI_SENSEI.adminAddCredit(uid, amount);
+                // Cek apakah input berupa MNN-ID atau UID mentah
+            const isMemberId = /^MNN-/i.test(uid);
+            const res = isMemberId
+                ? await AI_SENSEI.adminAddCreditByMemberId(uid, amount)
+                : await AI_SENSEI.adminAddCredit(uid, amount);
 
                 adminBtn.disabled = false;
                 adminBtn.textContent = 'Tambah Credit';
 
                 if (result) {
                     result.textContent = res.success
-                        ? 'Berhasil! ' + amount + ' credit ditambahkan ke ' + uid
+                        ? 'Berhasil! ' + amount + ' credit ditambahkan ke ' + uid + (res.email ? ' (' + res.email + ')' : '')
                         : 'Gagal: ' + res.error;
                     result.className = 'aic-admin-result ' + (res.success ? 'aic-admin-ok' : 'aic-admin-err');
                 }
@@ -223,34 +230,46 @@ const AI_CREDIT_PAGE = (() => {
     // ─────────────────────────────────────────────────────
 
     function openTopUpRequest(credits, price) {
-        const uid = window.AUTH?.user?.uid || '-';
-        // Tampilkan instruksi manual
+        const memberId = window.AUTH?.user?.memberId || window.AUTH?.user?.uid || '-';
         const existing = document.getElementById('aic-topup-modal');
         if (existing) existing.remove();
+
+        const waMsg = encodeURIComponent(
+            'Halo Admin MNN Learning, saya ingin top up credit AI Sensei.\n\n' +
+            'MNN-ID: ' + memberId + '\n' +
+            'Paket: ' + credits + ' credit (' + price + ')\n\n' +
+            'Saya sudah transfer via QRIS. Mohon dikonfirmasi. Terima kasih!'
+        );
+        const waUrl = 'https://wa.me/6285601381064?text=' + waMsg;
 
         const modal = document.createElement('div');
         modal.id = 'aic-topup-modal';
         modal.innerHTML =
-            '<div class="ais-popup-box">' +
-            '<div class="ais-popup-icon">📦</div>' +
+            '<div class="ais-popup-box aic-topup-box">' +
+            '<button class="aic-topup-close" id="aic-topup-close-btn">&#10005;</button>' +
             '<div class="ais-popup-title">Top Up ' + credits + ' Credit</div>' +
-            '<div class="ais-popup-body">' +
-                'Harga: <strong>' + price + '</strong><br><br>' +
-                'Kirim bukti transfer ke admin dengan menyertakan:<br>' +
-                '<code style="font-size:11px;word-break:break-all;display:block;margin-top:8px;background:rgba(255,255,255,0.05);padding:8px;border-radius:8px">' +
-                    'UID: ' + uid + '<br>' +
-                    'Paket: ' + credits + ' credit (' + price + ')' +
-                '</code>' +
+            '<div class="aic-topup-price">' + price + '</div>' +
+            '<div class="aic-qris-label">Scan QRIS untuk membayar</div>' +
+            '<div class="aic-qris-wrap">' +
+                '<img src="/qris.jpeg" alt="QRIS Rawliet.ID" class="aic-qris-img" ' +
+                'onerror="this.parentElement.innerHTML='<div class=aic-qris-err>Gambar QRIS tidak ditemukan</div>'">' +
             '</div>' +
-            '<div class="ais-popup-sub">Admin akan menambahkan credit setelah pembayaran dikonfirmasi.</div>' +
-            '<div class="ais-popup-actions">' +
-            '<button class="ais-popup-btn-primary" onclick="document.getElementById(\'aic-topup-modal\').remove()">Tutup</button>' +
+            '<div class="aic-topup-memberid">MNN-ID kamu: <strong>' + memberId + '</strong></div>' +
+            '<div class="aic-topup-note">Setelah bayar, tap tombol di bawah untuk konfirmasi ke admin via WhatsApp.</div>' +
+            '<div class="ais-popup-actions" style="flex-direction:column;gap:8px;margin-top:16px">' +
+                '<a href="' + waUrl + '" target="_blank" rel="noopener" class="aic-wa-btn">' +
+                    '&#128732; Saya Sudah Bayar &mdash; Konfirmasi via WhatsApp' +
+                '</a>' +
+                '<button class="ais-popup-btn-secondary" id="aic-topup-close-bottom">Batal</button>' +
             '</div>' +
             '</div>';
+
         document.body.appendChild(modal);
+        document.getElementById('aic-topup-close-btn').onclick    = () => modal.remove();
+        document.getElementById('aic-topup-close-bottom').onclick = () => modal.remove();
+        modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
     }
 
-    // ─────────────────────────────────────────────────────
     // PUBLIC
     // ─────────────────────────────────────────────────────
     return { render, openTopUpRequest };

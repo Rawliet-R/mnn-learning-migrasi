@@ -248,6 +248,62 @@ const AI_SENSEI = (() => {
         }
     }
     // ─────────────────────────────────────────────────────
+    // ADMIN — tambah credit via MemberId (MNN-XXXXXX)
+    // ─────────────────────────────────────────────────────
+
+    /**
+     * Admin: cari user berdasarkan memberId lalu tambah credit.
+     * Lebih user-friendly daripada UID mentah.
+     * @param {string} memberId - contoh: "MNN-849622"
+     * @param {number} amount
+     */
+    async function adminAddCreditByMemberId(memberId, amount) {
+        if (window.AUTH?.user?.role !== 'admin') {
+            return { success: false, error: 'Hanya admin yang bisa melakukan ini.' };
+        }
+        if (!memberId || amount <= 0) {
+            return { success: false, error: 'MNN-ID dan jumlah tidak valid.' };
+        }
+        if (typeof _fbDb === 'undefined') {
+            return { success: false, error: 'Firestore tidak tersedia.' };
+        }
+        try {
+            // Query user berdasarkan memberId
+            const snap = await _fbDb.collection('users')
+                .where('memberId', '==', memberId.trim().toUpperCase())
+                .limit(1)
+                .get();
+
+            if (snap.empty) {
+                return { success: false, error: 'MNN-ID tidak ditemukan: ' + memberId };
+            }
+
+            const userDoc  = snap.docs[0];
+            const targetUid = userDoc.id;
+            const email    = userDoc.data().email || '-';
+
+            await userDoc.ref.set({
+                aiCredits: firebase.firestore.FieldValue.increment(amount),
+            }, { merge: true });
+
+            await _fbDb.collection('creditTransactions').add({
+                uid:       targetUid,
+                memberId:  memberId.trim().toUpperCase(),
+                amount,
+                type:      'manual_topup',
+                adminUid:  window.AUTH.user.uid,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+
+            console.log('[ADMIN] Credit ditambahkan:', amount, '-> memberId:', memberId, '| uid:', targetUid);
+            return { success: true, targetUid, email };
+        } catch (e) {
+            console.error('[ADMIN] adminAddCreditByMemberId error:', e.message);
+            return { success: false, error: e.message };
+        }
+    }
+
+    // ─────────────────────────────────────────────────────
     // SYSTEM PROMPT — Pembelajaran Bahasa Jepang
     // ─────────────────────────────────────────────────────
 
@@ -592,19 +648,27 @@ ${
             const snap = await targetRef.get();
             if (!snap.exists) return { success: false, error: 'User tidak ditemukan.' };
 
+            // STEP 1: Update credit — operasi utama
             await targetRef.set({
                 aiCredits: firebase.firestore.FieldValue.increment(amount),
             }, { merge: true });
 
-            await _fbDb.collection('creditTransactions').add({
-                uid:       targetUid,
-                amount,
-                type:      'manual_topup',
-                adminUid:  window.AUTH.user.uid,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            });
-
             console.log('[ADMIN] Credit ditambahkan:', amount, '-> uid:', targetUid);
+
+            // STEP 2: Log transaksi — non-blocking, jangan gagalkan operasi utama
+            try {
+                await _fbDb.collection('creditTransactions').add({
+                    uid:       targetUid,
+                    amount,
+                    type:      'manual_topup',
+                    adminUid:  window.AUTH.user.uid,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                });
+            } catch (logErr) {
+                // Log gagal tidak membatalkan sukses — credit sudah masuk
+                console.warn('[ADMIN] Log transaksi gagal (credit tetap masuk):', logErr.message);
+            }
+
             return { success: true };
         } catch (e) {
             console.error('[ADMIN] adminAddCredit error:', e.message);
@@ -910,6 +974,7 @@ ${
         handleSend,
         claimWelcomeBonus,
         adminAddCredit,
+        adminAddCreditByMemberId,
         detectFeature: _detectFeature,
     };
 
