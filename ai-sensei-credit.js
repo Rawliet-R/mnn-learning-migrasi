@@ -23,28 +23,46 @@ const AI_CREDIT_PAGE = (() => {
 
         container.innerHTML = '<div class="aic-loading-wrap"><div class="aic-spinner"></div></div>';
 
-        // Ambil data credit
-        const credits = window.AI_SENSEI
-            ? await AI_SENSEI.getCredits()
-            : { total: 0, remaining: 0, used: 0, plan: 'free', error: true };
+        try {
+            // Timeout 8 detik — jika Firestore lambat, tetap tampilkan UI
+            const withTimeout = (promise, ms) => Promise.race([
+                promise,
+                new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))
+            ]);
 
-        // Update header balance
-        if (header) header.textContent = (credits.remaining ?? 0) + ' credit';
+            // Ambil data credit
+            const credits = window.AI_SENSEI
+                ? await withTimeout(AI_SENSEI.getCredits(), 8000).catch(() => ({
+                    total: 0, remaining: 0, used: 0, plan: 'free', error: true
+                  }))
+                : { total: 0, remaining: 0, used: 0, plan: 'free', error: true };
 
-        // Ambil riwayat penggunaan
-        const logs = await _fetchUsageLogs();
+            // Update header balance
+            if (header) header.textContent = (credits.remaining ?? 0) + ' credit';
 
-        const isAdmin = window.AI_FLAG?.isAdmin?.() || false;
-        const isPrem  = typeof isPremiumUser === 'function' && isPremiumUser();
+            // Ambil riwayat — tanpa orderBy agar tidak butuh index Firestore
+            const logs = await withTimeout(_fetchUsageLogs(), 5000).catch(() => []);
 
-        container.innerHTML =
-            _renderBalanceCard(credits, isPrem) +
-            _renderWelcomeBonus(credits) +
-            _renderUsageHistory(logs) +
-            _renderTopUpPackages() +
-            (isAdmin ? _renderAdminTools() : '');
+            const isAdmin = window.AI_FLAG?.isAdmin?.() || false;
+            const isPrem  = typeof isPremiumUser === 'function' && isPremiumUser();
 
-        _bindEvents();
+            container.innerHTML =
+                _renderBalanceCard(credits, isPrem) +
+                _renderWelcomeBonus() +
+                _renderUsageHistory(logs) +
+                _renderTopUpPackages() +
+                (isAdmin ? _renderAdminTools() : '');
+
+            _bindEvents();
+
+        } catch (e) {
+            console.error('[AIC_PAGE] render error:', e.message);
+            container.innerHTML =
+                '<div style="text-align:center;padding:48px 24px;color:var(--text-muted,#888)">' +
+                '<div style="font-size:32px;margin-bottom:12px">⚠️</div>' +
+                '<div style="font-size:14px">Gagal memuat halaman credit.<br>Coba kembali dan buka lagi.</div>' +
+                '</div>';
+        }
     }
 
     // ─────────────────────────────────────────────────────
@@ -55,12 +73,19 @@ const AI_CREDIT_PAGE = (() => {
         const uid = window.AUTH?.user?.uid;
         if (!uid || typeof _fbDb === 'undefined') return [];
         try {
+            // Tanpa orderBy agar tidak butuh Firestore composite index
             const snap = await _fbDb.collection('aiUsageLogs')
                 .where('uid', '==', uid)
-                .orderBy('createdAt', 'desc')
                 .limit(15)
                 .get();
-            return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            // Sort manual di client setelah data masuk
+            const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            docs.sort((a, b) => {
+                const ta = a.createdAt?.seconds || 0;
+                const tb = b.createdAt?.seconds || 0;
+                return tb - ta;
+            });
+            return docs;
         } catch (e) {
             console.warn('[AIC_PAGE] _fetchUsageLogs error:', e.message);
             return [];
@@ -92,7 +117,7 @@ const AI_CREDIT_PAGE = (() => {
         '</div>';
     }
 
-    function _renderWelcomeBonus(credits) {
+    function _renderWelcomeBonus() {
         const uid      = window.AUTH?.user?.uid;
         const memberId = window.AUTH?.user?.memberId || '-';
         if (!uid) return '';
