@@ -4388,6 +4388,10 @@ function _hideSplash() {
 }
 
 function _enterApp() {
+    // Update visibilitas nav AI Sensei berdasarkan feature flag
+    if (window.AI_FLAG) {
+        AI_FLAG.updateNavVisibility();
+    }
     console.log('[AUTH] AUTH_READY — state:', AUTH_STATE, '| isPremium:', isPremiumUser());
     console.log('[AUTH] PREMIUM_STATE_FINAL — isPremiumUser():', isPremiumUser(),
                 '| AUTH.user.isPremium:', AUTH.user?.isPremium);
@@ -4478,6 +4482,9 @@ _fbAuth.onAuthStateChanged(async fbUser => {
                 console.log('[FIRESTORE_SOURCE_OF_TRUTH] Writing isPremium:', data.isPremium === true,
                             '| raw value:', data.isPremium, '| uid:', fbUser.uid);
                 AUTH.user.isPremium = data.isPremium === true;
+                // Load role (untuk Feature Flag AI Sensei)
+                AUTH.user.role = data.role || 'user';
+                console.log('[AUTH] ROLE_LOADED —', AUTH.user.role, '| uid:', fbUser.uid);
                 // Load memberId if it exists in Firestore
                 if (data.memberId) {
                     AUTH.user.memberId = data.memberId;
@@ -6051,6 +6058,34 @@ function navigateTo(page) {
     document.querySelectorAll('.page').forEach(p => {
         p.classList.toggle('active', p.id === 'page-' + page);
     });
+    // ── AI Sensei: feature flag + init saat halaman dibuka ──
+    if (page === 'ai-sensei') {
+        // Cek akses dulu sebelum render
+        if (window.AI_FLAG) {
+            AI_FLAG.checkAccess().then(result => {
+                if (!result.allowed) {
+                    // Redirect ke dashboard, tampilkan pesan
+                    STATE.currentPage = 'dashboard';
+                    document.querySelectorAll('.page').forEach(p => {
+                        p.classList.toggle('active', p.id === 'page-dashboard');
+                    });
+                    document.querySelectorAll('.nav-item').forEach(n => {
+                        n.classList.toggle('active', n.dataset.page === 'dashboard');
+                    });
+                    AI_FLAG.showBlockedToast(result.reason);
+                    return;
+                }
+                requestAnimationFrame(() => {
+                    if (window.AI_SENSEI) AI_SENSEI.init();
+                });
+            });
+        } else {
+            requestAnimationFrame(() => {
+                if (window.AI_SENSEI) AI_SENSEI.init();
+            });
+        }
+        return; // early return — nav active dihandle async di atas atau oleh checkAccess
+    }
     document.querySelectorAll('.nav-item').forEach(n => {
         n.classList.toggle('active', n.dataset.page === page);
     });

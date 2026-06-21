@@ -58,6 +58,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Noto+Sans+JP:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="ai-sensei.css" />
 </head>
 <body>
 
@@ -1046,6 +1047,58 @@
       <div id="jft-exam-container" class="jft-exam-container"><!-- exam_engine_v9.js renders here --></div>
     </section>
 
+    <!-- ═══ AI SENSEI BETA ═══ -->
+    <section class="page" id="page-ai-sensei" role="main" aria-label="AI Sensei Beta">
+
+      <!-- HEADER -->
+      <header class="ais-header">
+        <div class="ais-header-left">
+          <div class="ais-avatar" aria-hidden="true">🤖</div>
+          <div class="ais-header-info">
+            <span class="ais-header-title">AI Sensei</span>
+            <span class="ais-header-badge">Beta</span>
+            <div id="ais-credit-remaining" class="ais-credit-label">memuat...</div>
+          </div>
+        </div>
+        <div class="ais-credit-wrap" aria-label="Sisa kredit AI">
+          <div class="ais-credit-track">
+            <div class="ais-credit-bar-fill" id="ais-credit-bar" style="width:100%"></div>
+          </div>
+        </div>
+        <button id="ais-new-chat-btn" aria-label="Mulai chat baru">+ Baru</button>
+      </header>
+
+      <!-- QUICK QUESTIONS -->
+      <div class="ais-quick-wrap" role="list" aria-label="Pertanyaan cepat">
+        <button class="ais-quick-btn" role="listitem" data-q="Apa perbedaan は (wa) dan が (ga)?">は vs が</button>
+        <button class="ais-quick-btn" role="listitem" data-q="Bagaimana cara membentuk kalimat て-form?">て-form</button>
+        <button class="ais-quick-btn" role="listitem" data-q="Apa perbedaan に (ni) dan で (de) dalam kalimat tempat?">に vs で</button>
+        <button class="ais-quick-btn" role="listitem" data-q="Jelaskan pola kalimat 〜たいです beserta contohnya.">〜たいです</button>
+        <button class="ais-quick-btn" role="listitem" data-q="Bagaimana cara menghitung benda dalam bahasa Jepang (counter)?">Counter</button>
+      </div>
+
+      <!-- MESSAGES -->
+      <div id="ais-messages" role="log" aria-live="polite" aria-label="Percakapan AI Sensei"></div>
+
+      <!-- INPUT -->
+      <div class="ais-input-wrap">
+        <textarea
+          id="ais-input"
+          placeholder="Tanya tentang bahasa Jepang..."
+          rows="1"
+          aria-label="Tulis pertanyaan kamu"
+          autocomplete="off"
+          spellcheck="false"
+        ></textarea>
+        <button id="ais-send-btn" aria-label="Kirim pertanyaan">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+          </svg>
+        </button>
+      </div>
+
+    </section>
+
   </main>
 
   </div><!-- /.app-main-col -->
@@ -1076,6 +1129,10 @@
       <button class="nav-item" data-page="settings" aria-label="Pengaturan">
         <div class="nav-icon-wrap"><span class="nav-icon">⚙️</span></div>
         <span class="nav-label">Setelan</span>
+      </button>
+      <button class="nav-item" data-page="ai-sensei" aria-label="AI Sensei">
+        <div class="nav-icon-wrap"><span class="nav-icon">🤖</span></div>
+        <span class="nav-label">Sensei</span>
       </button>
 
     </div>
@@ -1157,6 +1214,11 @@
 
 <!-- ══ Migration notice — soft, dismissible "new version available" banner ══ -->
 <script src="migration-notice.js" defer></script>
+
+<!-- ══ AI Sensei Feature Flag (load SEBELUM ai-sensei.js) ══ -->
+<script src="ai-sensei-flag.js"></script>
+<!-- ══ AI Sensei Beta ══ -->
+<script src="ai-sensei.js"></script>
 
 </body>
 </html>
