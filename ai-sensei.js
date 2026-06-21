@@ -23,7 +23,7 @@ const AI_SENSEI = (() => {
 
     const FREE_CREDITS_MONTHLY   = 20;
     const PREMIUM_CREDITS_MONTHLY = 200;
-    const MODEL = 'google/openai/gpt-4o-mini';
+    const MODEL = 'openai/gpt-4o-mini';
     const MAX_HISTORY_TURNS = 6; // simpan 6 pasang user+assistant
 
     // Biaya credit per fitur
