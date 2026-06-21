@@ -819,3 +819,53 @@
     transition: background 0.15s;
 }
 .aic-wa-btn:hover { background: #1ebe59; }
+
+/* ─── Quick Buttons — Roleplay highlight ─── */
+.ais-quick-btn.ais-quick-roleplay {
+    background: rgba(108,99,255,0.12);
+    border-color: rgba(108,99,255,0.3);
+    color: #c4c0ff;
+}
+.ais-quick-btn.ais-quick-roleplay:hover {
+    background: rgba(108,99,255,0.25);
+}
+
+/* ─── QRIS Zoom Overlay ─── */
+#aic-qris-zoom {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 16px;
+}
+.aic-qris-zoom-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    max-width: 400px;
+    width: 100%;
+}
+.aic-qris-zoom-img {
+    width: 100%;
+    height: auto;
+    border-radius: 16px;
+    background: #fff;
+    padding: 16px;
+    box-sizing: border-box;
+    /* Pinch zoom di mobile */
+    touch-action: pinch-zoom;
+}
+.aic-qris-zoom-close {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px 28px;
+    border-radius: 99px;
+    cursor: pointer;
+}

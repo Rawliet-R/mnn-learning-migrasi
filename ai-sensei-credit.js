@@ -276,7 +276,8 @@ const AI_CREDIT_PAGE = (() => {
             '<div class="aic-topup-price">' + price + '</div>' +
             '<div class="aic-qris-label">Scan QRIS untuk membayar</div>' +
             '<div class="aic-qris-wrap">' +
-                '<img src="/qris.jpeg" alt="QRIS Rawliet.ID" class="aic-qris-img">' +
+                '<img src="/qris.jpeg" alt="QRIS Rawliet.ID" class="aic-qris-img" ' +
+                'onclick="AI_CREDIT_PAGE.zoomQris()" style="cursor:zoom-in" title="Tap untuk zoom">' +
             '</div>' +
             '<div class="aic-topup-memberid">MNN-ID kamu: <strong>' + memberId + '</strong></div>' +
             '<div class="aic-topup-note">Setelah bayar, tap tombol di bawah untuk konfirmasi ke admin via WhatsApp.</div>' +
@@ -296,7 +297,22 @@ const AI_CREDIT_PAGE = (() => {
 
     // PUBLIC
     // ─────────────────────────────────────────────────────
-    return { render, openTopUpRequest };
+    // ── QRIS Zoom ──
+    function zoomQris() {
+        const existing = document.getElementById('aic-qris-zoom');
+        if (existing) { existing.remove(); return; }
+        const overlay = document.createElement('div');
+        overlay.id = 'aic-qris-zoom';
+        overlay.innerHTML =
+            '<div class="aic-qris-zoom-inner">' +
+            '<img src="/qris.jpeg" alt="QRIS" class="aic-qris-zoom-img">' +
+            '<button class="aic-qris-zoom-close" onclick="document.getElementById('aic-qris-zoom').remove()">&#x2715; Tutup</button>' +
+            '</div>';
+        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+    }
+
+    return { render, openTopUpRequest, zoomQris };
 
 })();
 

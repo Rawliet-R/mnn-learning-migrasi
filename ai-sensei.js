@@ -40,6 +40,7 @@ const AI_SENSEI = (() => {
     let _chatHistory  = [];   // [{role, content}, ...]
     let _isLoading    = false;
     let _creditsCache = null; // cache supaya tidak spam Firestore
+    let _evAbort      = null; // AbortController untuk event listeners — cegah duplikat
 
     // ─────────────────────────────────────────────────────
     // CREDIT MANAGER
@@ -355,7 +356,11 @@ const AI_SENSEI = (() => {
 'Jika pengguna meminta latihan: sesuaikan level, berikan soal bertahap, tunggu jawaban, koreksi dan jelaskan.\n\n' +
 'SIMULASI PERCAKAPAN\n' +
 'Jika pengguna meminta percakapan: berperan sebagai orang Jepang, gunakan percakapan realistis.\n' +
-'Situasi yang bisa disimulasikan: interview kerja, restoran, konbini, tempat kerja, kehidupan sehari-hari.\n\n' +
+'Situasi yang bisa disimulasikan: interview kerja, restoran, konbini, tempat kerja, kehidupan sehari-hari.\n' +
+'FEEDBACK SELAMA ROLEPLAY:\n' +
+'Jika jawaban user terlalu pendek (kurang dari 5 kata): hentikan roleplay sebentar, minta user menjawab lebih lengkap dan natural.\n' +
+'Jika user menggunakan bahasa kasual/tidak sopan saat roleplay interview/kerja: berikan koreksi sopan, contohkan bentuk yang benar, lalu lanjutkan roleplay.\n' +
+'Jika user menjawab dalam bahasa Indonesia padahal roleplay Jepang: ingatkan dan minta ulangi dalam bahasa Jepang.\n\n' +
 'JFT-BASIC DAN SSW\n' +
 'Prioritaskan jawaban relevan untuk kebutuhan kerja di Jepang.\n' +
 'Berikan contoh yang sering muncul di tempat kerja. Fokus pada penggunaan praktis.\n\n' +
@@ -894,26 +899,29 @@ ${
             refreshCreditDisplay();
         });
 
-        // Setup input event: auto-resize + Enter to send
+        // Abort listener lama sebelum attach yang baru — cegah duplikat
+        if (_evAbort) _evAbort.abort();
+        _evAbort = new AbortController();
+        const _sig = { signal: _evAbort.signal };
+
+        // Input: auto-resize + Enter to send
         const inp = document.getElementById('ais-input');
         if (inp) {
             inp.addEventListener('input', () => {
                 inp.style.height = 'auto';
                 inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
-            });
+            }, _sig);
             inp.addEventListener('keydown', e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     handleSend();
                 }
-            });
+            }, _sig);
         }
 
         // Tombol kirim
         const sendBtn = document.getElementById('ais-send-btn');
-        if (sendBtn) {
-            sendBtn.addEventListener('click', handleSend);
-        }
+        if (sendBtn) sendBtn.addEventListener('click', handleSend, _sig);
 
         // Tombol chat baru
         const newBtn = document.getElementById('ais-new-chat-btn');
@@ -924,10 +932,10 @@ ${
                 if (container) container.innerHTML = '';
                 _appendWelcomeMessage();
                 inp?.focus();
-            });
+            }, _sig);
         }
 
-        // Tombol quick question
+        // Tombol quick action
         document.querySelectorAll('.ais-quick-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const q = btn.dataset.q;
@@ -935,7 +943,7 @@ ${
                 const inp2 = document.getElementById('ais-input');
                 if (inp2) inp2.value = q;
                 handleSend();
-            });
+            }, _sig);
         });
 
         // Tampilkan pesan selamat datang jika container kosong
