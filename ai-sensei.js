@@ -257,7 +257,7 @@ const AI_SENSEI = (() => {
             }
         } catch (_) {}
 
-        return `Kamu adalah AI Sensei — asisten pembelajaran bahasa Jepang untuk aplikasi MNN Learning (Minna no Nihongo).
+        return `Kamu adalah AI Sensei - asisten pembelajaran bahasa Jepang untuk aplikasi MNN Learning (Minna no Nihongo).
 
 PERAN:
 - Bantu pelajar Indonesia memahami bahasa Jepang dengan cara yang ramah dan sabar.
@@ -271,7 +271,7 @@ ATURAN JAWABAN:
 3. Jelaskan MENGAPA suatu aturan berlaku, bukan hanya "bagaimana"-nya.
 4. Gunakan format yang rapi: pisahkan penjelasan, contoh, dan catatan penting.
 5. Jika ada beberapa cara penggunaan, jelaskan perbedaannya.
-6. Maksimal 400 kata per jawaban — padat, jelas, tidak bertele-tele.
+6. Maksimal 400 kata per jawaban - padat, jelas, tidak bertele-tele.
 
 TOPIK YANG BISA DITANYAKAN:
 - Arti dan penggunaan kosakata Jepang
@@ -347,10 +347,13 @@ ${
         ];
 
         try {
+            // Encode sebagai Blob UTF-8 — fix error ByteString untuk karakter Jepang
+            const _payload = JSON.stringify({ model: MODEL, messages });
+            const _blob    = new Blob([_payload], { type: 'application/json; charset=utf-8' });
             const res = await fetch('/api/ai-proxy', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ model: MODEL, messages })
+                headers: { 'Content-Type': 'application/json; charset=utf-8' },
+                body: _blob
             });
 
             if (!res.ok) {
