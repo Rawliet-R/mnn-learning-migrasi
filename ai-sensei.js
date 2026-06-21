@@ -23,7 +23,7 @@ const AI_SENSEI = (() => {
 
     const FREE_CREDITS_MONTHLY   = 20;
     const PREMIUM_CREDITS_MONTHLY = 200;
-    const MODEL = 'google/gemini-flash-1.5';
+    const MODEL = 'google/gemini-2.0-flash-exp:free';
     const MAX_HISTORY_TURNS = 6; // simpan 6 pasang user+assistant
 
     // ── State chat ──
