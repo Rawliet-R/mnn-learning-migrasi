@@ -57,7 +57,7 @@ module.exports = async function handler(req, res) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
         'HTTP-Referer': referer,
-        'X-Title': 'MNN Learning – AI Sensei',
+        'X-Title': 'MNN Learning - AI Sensei',
       },
       body: JSON.stringify({ model, max_tokens: 900, messages }),
     });
