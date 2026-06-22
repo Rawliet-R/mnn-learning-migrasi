@@ -23,7 +23,7 @@ const AI_SENSEI = (() => {
 
     const FREE_CREDITS_MONTHLY   = 20;
     const PREMIUM_CREDITS_MONTHLY = 200;
-    const MODEL = 'openai/gpt-4o-mini';
+    const MODEL = 'google/gemini-2.0-flash-lite';
     const MAX_HISTORY_TURNS = 6; // simpan 6 pasang user+assistant
 
     // Biaya credit per fitur
@@ -808,24 +808,31 @@ ${
         const msg = inp.value.trim();
         if (!msg || _isLoading) return;
 
-        // Deteksi fitur & biaya sebelum apapun
-        const { feature, cost } = _detectFeature(msg);
-
-        // Cek credit SEBELUM kirim request
-        const credits = await getCredits();
-        if (!credits.isGuest && !credits.error && credits.remaining < cost) {
-            _showCreditPopup(cost, credits.remaining);
-            return; // blok — jangan kirim ke AI
-        }
-
+        // ── KUNCI ANTI-DUPLIKAT ──
+        // Set _isLoading dan clear input SEBELUM await apapun.
+        // Tanpa ini, await getCredits() (~300ms) memberi celah
+        // bagi klik/trigger kedua untuk lolos masuk.
+        _isLoading = true;
         inp.value = '';
         inp.style.height = 'auto';
         _setInputDisabled(true);
 
-        // Tampilkan badge biaya di atas bubble user
-        _showCostBadge(feature, cost);
+        // Deteksi fitur & biaya
+        const { feature, cost } = _detectFeature(msg);
 
-        // Bubble user
+        // Cek credit — sekarang aman karena _isLoading sudah true
+        const credits = await getCredits();
+        if (!credits.isGuest && !credits.error && credits.remaining < cost) {
+            // Credit tidak cukup — reset state dan tampilkan popup
+            _isLoading = false;
+            _setInputDisabled(false);
+            inp.value = msg; // kembalikan pesan ke input
+            _showCreditPopup(cost, credits.remaining);
+            return;
+        }
+
+        // Tampilkan badge biaya + bubble user
+        _showCostBadge(feature, cost);
         appendMessage('user', msg);
 
         // Loading dots
