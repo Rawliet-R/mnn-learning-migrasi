@@ -151,12 +151,15 @@ const AI_CREDIT_PAGE = (() => {
             '</div>';
         }
 
-        const rows = logs.map(log => {
+        const PREVIEW_COUNT = 5;
+
+        const rows = logs.map((log, idx) => {
             const icon = featureIcon[log.feature] || '🤖';
             const date = log.createdAt?.toDate
                 ? log.createdAt.toDate().toLocaleDateString('id-ID', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })
                 : '-';
-            return '<div class="aic-log-row">' +
+            const hiddenClass = idx >= PREVIEW_COUNT ? ' aic-log-hidden' : '';
+            return '<div class="aic-log-row' + hiddenClass + '">' +
                 '<span class="aic-log-icon">' + icon + '</span>' +
                 '<div class="aic-log-info">' +
                     '<div class="aic-log-feature">' + (log.feature || 'AI Sensei') + '</div>' +
@@ -166,9 +169,26 @@ const AI_CREDIT_PAGE = (() => {
             '</div>';
         }).join('');
 
+        const toggleBtn = logs.length > PREVIEW_COUNT
+            ? '<button class="aic-history-toggle" onclick="' +
+              '(function(btn){' +
+              'var card=btn.closest(\'.aic-card\');' +
+              'var hidden=card.querySelectorAll(\'.aic-log-hidden\');' +
+              'var isExpanded=btn.classList.contains(\'expanded\');' +
+              'hidden.forEach(function(el){el.style.display=isExpanded?\'none\':\'\';el.classList.toggle(\'aic-log-hidden\',isExpanded);});' +
+              'btn.classList.toggle(\'expanded\',!isExpanded);' +
+              'btn.querySelector(\'.aic-history-toggle-label\').textContent=isExpanded?' +
+              '\'Lihat semua (' + logs.length + ')\':\' Sempit\';' +
+              '})(this)">' +
+              '<span class="aic-history-toggle-label">Lihat semua (' + logs.length + ')</span>' +
+              '<span class="aic-history-toggle-icon">▼</span>' +
+              '</button>'
+            : '';
+
         return '<div class="aic-card">' +
             '<div class="aic-section-title">Riwayat Penggunaan</div>' +
             rows +
+            toggleBtn +
         '</div>';
     }
 

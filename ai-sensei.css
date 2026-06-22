@@ -1376,3 +1376,123 @@ main.ais-page-active {
     border-color: rgba(108,99,255,0.2);
 }
 [data-theme="light"] .aish-item-title { color: var(--text-primary, #1a1a2e); }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   BUG FIX — 2026-06-22
+   1. Double input bar (mobile)
+   2. Desktop panel blank
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────
+   FIX 1 — MOBILE: input bar dobel
+   Masalah: main.ais-page-active { padding:0 } menghapus
+   padding-bottom 100px yang biasanya mencegah konten
+   masuk di balik bottom-nav (position:fixed; bottom:0).
+   Akibatnya page mencapai bawah viewport, ais-input-wrap
+   harus z-index:95 agar muncul di atas nav → tampak dobel.
+
+   Fix: kembalikan padding-bottom setara tinggi nav,
+        reset z-index input-wrap ke normal.
+───────────────────────────────────────────── */
+@media (max-width: 1023px) {
+    main.ais-page-active {
+        /* nav height ≈ 68px + safe area inset */
+        padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+    /* Tidak perlu lagi lebih tinggi dari nav */
+    .ais-input-wrap {
+        z-index: 5 !important;
+    }
+}
+
+/* ─────────────────────────────────────────────
+   FIX 2 — DESKTOP (≥1024px): panel AI blank
+   Masalah: #app.ais-app-lock set flex-direction:column
+   yang merusak layout desktop (sidebar row + content).
+   main.ais-page-active juga dapat max-width:760px dari
+   desktop style yang bikin panel sempit & konten hilang.
+
+   Fix: pertahankan flex-direction:row di desktop,
+        pasang height chain pada .app-main-col,
+        hapus max-width + margin dari main AI.
+───────────────────────────────────────────── */
+@media (min-width: 1024px) {
+    /* Pertahankan layout sidebar + kolom konten */
+    #app.ais-app-lock {
+        flex-direction: row !important;
+        height: 100dvh !important;
+        overflow: hidden !important;
+        align-items: stretch !important;
+    }
+
+    /* Kolom kanan harus full-height flex column */
+    #app.ais-app-lock > .app-main-col {
+        flex: 1 !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+        height: 100dvh !important;
+    }
+
+    /* main.ais-page-active: full width, tanpa padding */
+    main.ais-page-active {
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        height: 100% !important;
+        flex: 1 !important;
+        min-height: 0 !important;
+    }
+}
+
+/* ─────────────────────────────────────────────
+   FIX 3 (CSS) — Collapsible usage history
+   Toggle button + animasi untuk expand/collapse list
+───────────────────────────────────────────── */
+.aic-history-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    background: none;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    color: var(--text-muted, #888);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 9px 14px;
+    margin-top: 10px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    font-family: inherit;
+}
+.aic-history-toggle:hover {
+    background: rgba(108,99,255,0.08);
+    border-color: rgba(108,99,255,0.3);
+    color: #9d97ff;
+}
+.aic-history-toggle-icon {
+    font-size: 10px;
+    transition: transform 0.2s ease;
+    display: inline-block;
+}
+.aic-history-toggle.expanded .aic-history-toggle-icon {
+    transform: rotate(180deg);
+}
+.aic-log-hidden {
+    display: none !important;
+}
+[data-theme="light"] .aic-history-toggle {
+    border-color: rgba(0,0,0,0.1);
+    color: var(--text-secondary, #5a5a7a);
+}
+[data-theme="light"] .aic-history-toggle:hover {
+    background: rgba(108,99,255,0.05);
+    border-color: rgba(108,99,255,0.2);
+    color: #5a54e0;
+}
