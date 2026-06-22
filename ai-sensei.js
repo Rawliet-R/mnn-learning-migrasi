@@ -964,15 +964,29 @@ ${
             _appendWelcomeMessage();
         }
 
-        // ── Scroll to top button ──
-        const scrollTopBtn = document.getElementById('ais-scroll-top');
-        if (container && scrollTopBtn) {
-            container.addEventListener('scroll', () => {
-                scrollTopBtn.classList.toggle('visible', container.scrollTop > 200);
-            }, _sig);
-            scrollTopBtn.addEventListener('click', () => {
-                container.scrollTo({ top: 0, behavior: 'smooth' });
-            }, _sig);
+        // ── Scroll buttons: top & bottom ──
+        const scrollTopBtn  = document.getElementById('ais-scroll-top');
+        const scrollBotBtn  = document.getElementById('ais-scroll-bottom');
+        if (container) {
+            const _updateScrollBtns = () => {
+                const fromTop    = container.scrollTop;
+                const fromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+                if (scrollTopBtn) scrollTopBtn.classList.toggle('visible', fromTop > 200);
+                if (scrollBotBtn) scrollBotBtn.classList.toggle('visible', fromBottom > 100);
+            };
+            container.addEventListener('scroll', _updateScrollBtns, _sig);
+            if (scrollTopBtn) {
+                scrollTopBtn.addEventListener('click', () => {
+                    container.scrollTo({ top: 0, behavior: 'smooth' });
+                }, _sig);
+            }
+            if (scrollBotBtn) {
+                scrollBotBtn.addEventListener('click', () => {
+                    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+                }, _sig);
+            }
+            // Initial state
+            _updateScrollBtns();
         }
     }
 

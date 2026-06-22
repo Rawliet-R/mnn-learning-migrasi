@@ -871,66 +871,78 @@
 }
 
 /* ════════════════════════════════════════════════════════
-   UI FIX — Layout Fixed + Light Mode + Scroll UX
+   UI FIX — Layout In-flow + Light Mode + Scroll UX
+   Tidak pakai position:fixed agar tidak overlap header/sidebar.
+   Page mengisi container alaminya di dalam <main>.
    ════════════════════════════════════════════════════════ */
 
-/* ── 1. Page: fixed layout agar header & input tidak ikut scroll ── */
+/* ── 1. Page: isi penuh container <main>, flex column ── */
 #page-ai-sensei {
-    /* Override: pakai CSS variables dari app */
     background: var(--bg-base, #0f0f13) !important;
-    /* Fixed column layout — header top, input bottom, messages tengah */
     display: none;
     flex-direction: column;
-    position: fixed !important;
-    top: 0;
-    left: 0;
-    right: 0;
-    /* Beri ruang untuk bottom nav (~60px) */
-    bottom: 60px;
-    height: auto !important;
-    max-height: none !important;
+    /* Ambil tinggi penuh container — main sudah dikurangi header & bottom-nav */
+    height: 100%;
+    max-height: 100%;
     overflow: hidden;
-    z-index: 10;
+    /* Reset dari CSS sebelumnya */
+    position: relative !important;
+    top: auto !important; left: auto !important;
+    right: auto !important; bottom: auto !important;
 }
 #page-ai-sensei.active { display: flex; }
 
-/* ── 2. Header: sticky top ── */
+/* Pastikan .page.active tidak override dengan gap */
+#page-ai-sensei.active {
+    gap: 0 !important;
+    animation: none !important;
+}
+
+/* ── 2. Header: tetap di atas, tidak ikut scroll ── */
 .ais-header {
     background: var(--bg-base, #0f0f13) !important;
     border-bottom: 1px solid var(--border, rgba(255,255,255,0.07)) !important;
     flex-shrink: 0;
-    position: sticky;
-    top: 0;
+    position: relative;
     z-index: 5;
 }
 
-/* ── 3. Quick wrap: tidak scroll bersama messages ── */
+/* ── 3. Quick wrap: tidak ikut scroll ── */
 .ais-quick-wrap {
     flex-shrink: 0;
     background: var(--bg-base, #0f0f13);
 }
 
-/* ── 4. Messages: hanya area ini yang scroll ── */
+/* ── 4. Messages: HANYA ini yang scroll ── */
 #ais-messages {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    /* Penting: pastikan ini yang scroll, bukan parent */
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
+    /* min-height: 0 penting untuk flex child dengan overflow */
+    min-height: 0;
 }
 
-/* ── 5. Input wrap: sticky bottom ── */
+/* ── 5. Input wrap: tetap di bawah, tidak ikut scroll ── */
 .ais-input-wrap {
     background: var(--bg-base, #0f0f13) !important;
     border-top: 1px solid var(--border, rgba(255,255,255,0.07)) !important;
     flex-shrink: 0;
-    position: sticky;
-    bottom: 0;
+    position: relative;
     z-index: 5;
-    /* Safe area keyboard iOS */
     padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+/* ── 6. Pastikan <main> dan parent punya height yang benar ── */
+/* main harus fill sisa ruang antara header & bottom-nav */
+main:has(#page-ai-sensei.active) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    padding: 0 !important;
 }
 
 /* ── 6. Scroll to Top Button ── */
@@ -1141,3 +1153,59 @@
     border-color: var(--border-strong, rgba(0,0,0,0.13));
     color: var(--text-primary, #1a1a2e);
 }
+
+/* ── Scroll to Bottom Button ── */
+#ais-scroll-bottom {
+    position: absolute;
+    bottom: 80px;
+    right: 14px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--bg-elevated, #23232f);
+    border: 1px solid var(--border-strong, rgba(255,255,255,0.14));
+    color: var(--text-primary, #f0f0f5);
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    opacity: 0;
+    transform: scale(0.8);
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+    z-index: 10;
+}
+#ais-scroll-bottom.visible {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+}
+[data-theme="light"] #ais-scroll-bottom {
+    background: var(--bg-surface, #fff);
+    border-color: var(--border-strong, rgba(0,0,0,0.13));
+    color: var(--text-primary, #1a1a2e);
+}
+
+/* ── AI Credit page desktop fix ── */
+#page-ai-credit {
+    position: relative !important;
+    top: auto !important; left: auto !important;
+    height: 100%;
+    max-height: 100%;
+}
+#page-ai-credit.active {
+    display: flex !important;
+    flex-direction: column;
+    gap: 0 !important;
+    animation: none !important;
+}
+main:has(#page-ai-credit.active) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    padding: 0 !important;
+}
+.aic-scroll { flex: 1; overflow-y: auto; min-height: 0; }
