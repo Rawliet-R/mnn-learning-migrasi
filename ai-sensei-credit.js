@@ -23,65 +23,64 @@ const AI_CREDIT_PAGE = (() => {
 
         container.innerHTML = '<div class="aic-loading-wrap"><div class="aic-spinner"></div></div>';
 
-        try {
-            // Timeout 8 detik — jika Firestore lambat, tetap tampilkan UI
-            const withTimeout = (promise, ms) => Promise.race([
-                promise,
-                new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))
-            ]);
-
-            // Ambil data credit
-            // Baca langsung dari Firestore tanpa lewat AI_SENSEI.getCredits()
-            // agar tidak tergantung state _isLoading di ai-sensei.js
-            const uid = window.AUTH?.user?.uid;
-            let credits = { total: 0, remaining: 0, used: 0, plan: 'free', error: true };
-            if (uid && typeof _fbDb !== 'undefined') {
-                try {
-                    const snap = await withTimeout(
-                        _fbDb.collection('users').doc(uid).get(), 6000
-                    );
-                    const d = snap.exists ? snap.data() : {};
-                    const aiCredits = d.aiCredits ?? 0;
-                    const aiUsage   = d.aiUsage   ?? 0;
-                    credits = {
-                        total:     aiCredits,
-                        remaining: aiCredits,
-                        used:      aiUsage,
-                        plan:      d.aiPlan ?? 'free',
-                        error:     false,
-                    };
-                    console.log('[AIC_PAGE] Credit loaded directly:', credits);
-                } catch (e) {
-                    console.error('[AIC_PAGE] Credit fetch error:', e.message);
-                }
+        // Safety timer — paksa tampil konten setelah 10 detik
+        const _safetyTimer = setTimeout(() => {
+            if (document.getElementById('aic-content')?.querySelector('.aic-spinner')) {
+                _showContent({ total:0, remaining:0, used:0, plan:'free', error:true }, [], false, false);
             }
+        }, 10000);
 
-            // Update header balance
+        function _showContent(credits, logs, isAdmin, isPrem) {
+            clearTimeout(_safetyTimer);
             if (header) header.textContent = (credits.remaining ?? 0) + ' credit';
-
-            // Ambil riwayat — tanpa orderBy agar tidak butuh index Firestore
-            const logs = await withTimeout(_fetchUsageLogs(), 5000).catch(() => []);
-
-            const isAdmin = window.AI_FLAG?.isAdmin?.() || false;
-            const isPrem  = typeof isPremiumUser === 'function' && isPremiumUser();
-
             container.innerHTML =
                 _renderBalanceCard(credits, isPrem) +
                 _renderWelcomeBonus() +
                 _renderUsageHistory(logs) +
                 _renderTopUpPackages() +
                 (isAdmin ? _renderAdminTools() : '');
-
             _bindEvents();
-
-        } catch (e) {
-            console.error('[AIC_PAGE] render error:', e.message);
-            container.innerHTML =
-                '<div style="text-align:center;padding:48px 24px;color:var(--text-muted,#888)">' +
-                '<div style="font-size:32px;margin-bottom:12px">⚠️</div>' +
-                '<div style="font-size:14px">Gagal memuat halaman credit.<br>Coba kembali dan buka lagi.</div>' +
-                '</div>';
         }
+
+        // Baca Firestore langsung — tanpa chaining promise yang bisa hang
+        const uid    = window.AUTH?.user?.uid;
+        const isAdmin = window.AI_FLAG?.isAdmin?.() || false;
+        const isPrem  = typeof isPremiumUser === 'function' && isPremiumUser();
+
+        let credits = { total:0, remaining:0, used:0, plan:'free', error:true };
+        let logs    = [];
+
+        if (!uid || typeof _fbDb === 'undefined') {
+            _showContent(credits, logs, isAdmin, isPrem);
+            return;
+        }
+
+        // Step 1: baca user doc
+        try {
+            const snap = await _fbDb.collection('users').doc(uid).get();
+            const d    = snap.exists ? snap.data() : {};
+            credits = {
+                total:     d.aiCredits ?? 0,
+                remaining: d.aiCredits ?? 0,
+                used:      d.aiUsage   ?? 0,
+                plan:      d.aiPlan    ?? 'free',
+                error:     false,
+            };
+        } catch (e) {
+            console.error('[AIC_PAGE] credit read error:', e.code, e.message);
+        }
+
+        // Update balance dulu sebelum logs selesai
+        if (header) header.textContent = (credits.remaining ?? 0) + ' credit';
+
+        // Step 2: baca logs (terpisah agar tidak block render)
+        try {
+            logs = await _fetchUsageLogs();
+        } catch (e) {
+            console.warn('[AIC_PAGE] logs error:', e.message);
+        }
+
+        _showContent(credits, logs, isAdmin, isPrem);
     }
 
     // ─────────────────────────────────────────────────────

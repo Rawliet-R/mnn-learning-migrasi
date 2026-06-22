@@ -1065,6 +1065,7 @@
             <div class="ais-credit-bar-fill" id="ais-credit-bar" style="width:100%"></div>
           </div>
         </div>
+        <button id="ais-history-btn" class="aic-header-link" aria-label="Riwayat Chat" title="Riwayat Chat">📋</button>
         <button class="aic-header-link" onclick="navigateTo('ai-credit')" aria-label="AI Credit">💳</button>
         <button id="ais-new-chat-btn" aria-label="Mulai chat baru">+ Baru</button>
       </header>
@@ -1122,6 +1123,18 @@
       </div>
 
     </section>
+
+    <!-- AI SENSEI HISTORY DRAWER -->
+    <div id="ais-history-overlay" class="aish-overlay"></div>
+    <div id="ais-history-drawer" class="aish-drawer" role="dialog" aria-label="Riwayat Chat">
+      <div class="aish-header">
+        <span class="aish-title">📋 Riwayat Chat</span>
+        <button class="aish-close" onclick="if(window.AI_HISTORY)AI_HISTORY.closeDrawer()" aria-label="Tutup">&#x2715;</button>
+      </div>
+      <div id="ais-history-list" class="aish-list">
+        <div class="aish-loading">Memuat...</div>
+      </div>
+    </div>
 
     <!-- AI CREDIT PAGE -->
     <section class="page" id="page-ai-credit" role="main" aria-label="AI Credit">
@@ -1256,6 +1269,8 @@
 <!-- ══ Migration notice — soft, dismissible "new version available" banner ══ -->
 <script src="migration-notice.js" defer></script>
 
+<!-- ══ AI Sensei History (load SEBELUM ai-sensei.js) ══ -->
+<script src="ai-sensei-history.js"></script>
 <!-- ══ AI Sensei Feature Flag (load SEBELUM ai-sensei.js) ══ -->
 <script src="ai-sensei-flag.js"></script>
 <!-- ══ AI Sensei Beta ══ -->

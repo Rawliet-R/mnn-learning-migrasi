@@ -852,6 +852,11 @@ ${
 
         if (result.success) {
             appendMessage('ai', result.answer);
+            // Simpan ke chat history Firestore
+            if (window.AI_HISTORY) {
+                await AI_HISTORY.saveMessage('user', msg);
+                await AI_HISTORY.saveMessage('assistant', result.answer);
+            }
             // Log usage ke Firestore
             await _logUsage(feature, cost);
             // Refresh kredit display
@@ -938,8 +943,9 @@ ${
         // Tombol chat baru
         const newBtn = document.getElementById('ais-new-chat-btn');
         if (newBtn) {
-            newBtn.addEventListener('click', () => {
+            newBtn.addEventListener('click', async () => {
                 resetChat();
+                if (window.AI_HISTORY) await AI_HISTORY.newChat();
                 const container = document.getElementById('ais-messages');
                 if (container) container.innerHTML = '';
                 _appendWelcomeMessage();
@@ -988,6 +994,16 @@ ${
             // Initial state
             _updateScrollBtns();
         }
+
+        // ── Tombol riwayat chat ──
+        const histBtn = document.getElementById('ais-history-btn');
+        if (histBtn) histBtn.addEventListener('click', () => {
+            if (window.AI_HISTORY) AI_HISTORY.toggleDrawer();
+        }, _sig);
+        const histOverlay = document.getElementById('ais-history-overlay');
+        if (histOverlay) histOverlay.addEventListener('click', () => {
+            if (window.AI_HISTORY) AI_HISTORY.closeDrawer();
+        }, _sig);
     }
 
     function _appendWelcomeMessage() {
@@ -1020,7 +1036,9 @@ ${
         claimWelcomeBonus,
         adminAddCredit,
         adminAddCreditByMemberId,
-        detectFeature: _detectFeature,
+        detectFeature: _detectFeature,,
+        // Untuk AI_HISTORY
+        pushHistory: (msg) => { _chatHistory.push(msg); },
     };
 
 })();
