@@ -158,8 +158,9 @@ const AI_CREDIT_PAGE = (() => {
             const date = log.createdAt?.toDate
                 ? log.createdAt.toDate().toLocaleDateString('id-ID', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })
                 : '-';
-            const hiddenClass = idx >= PREVIEW_COUNT ? ' aic-log-hidden' : '';
-            return '<div class="aic-log-row' + hiddenClass + '">' +
+            // data-extra tetap ada setelah expand — dipakai sebagai selector permanen
+            const extraAttr = idx >= PREVIEW_COUNT ? ' data-extra="true" style="display:none"' : '';
+            return '<div class="aic-log-row"' + extraAttr + '>' +
                 '<span class="aic-log-icon">' + icon + '</span>' +
                 '<div class="aic-log-info">' +
                     '<div class="aic-log-feature">' + (log.feature || 'AI Sensei') + '</div>' +
@@ -169,18 +170,19 @@ const AI_CREDIT_PAGE = (() => {
             '</div>';
         }).join('');
 
-        const toggleBtn = logs.length > PREVIEW_COUNT
+        const totalExtra = logs.length - PREVIEW_COUNT;
+        const toggleBtn = totalExtra > 0
             ? '<button class="aic-history-toggle" onclick="' +
               '(function(btn){' +
               'var card=btn.closest(\'.aic-card\');' +
-              'var hidden=card.querySelectorAll(\'.aic-log-hidden\');' +
+              'var extras=card.querySelectorAll(\'[data-extra]\');' +
               'var isExpanded=btn.classList.contains(\'expanded\');' +
-              'hidden.forEach(function(el){el.style.display=isExpanded?\'none\':\'\';el.classList.toggle(\'aic-log-hidden\',isExpanded);});' +
+              'extras.forEach(function(el){el.style.display=isExpanded?\'none\':\'\';});' +
               'btn.classList.toggle(\'expanded\',!isExpanded);' +
-              'btn.querySelector(\'.aic-history-toggle-label\').textContent=isExpanded?' +
-              '\'Lihat semua (' + logs.length + ')\':\' Sempit\';' +
+              'btn.querySelector(\'.aic-history-toggle-label\').textContent=' +
+              'isExpanded?\'Lihat semua (+' + totalExtra + ')\':\' Sempit\';' +
               '})(this)">' +
-              '<span class="aic-history-toggle-label">Lihat semua (' + logs.length + ')</span>' +
+              '<span class="aic-history-toggle-label">Lihat semua (+' + totalExtra + ')</span>' +
               '<span class="aic-history-toggle-icon">▼</span>' +
               '</button>'
             : '';
