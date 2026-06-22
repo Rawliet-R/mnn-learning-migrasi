@@ -31,11 +31,30 @@ const AI_CREDIT_PAGE = (() => {
             ]);
 
             // Ambil data credit
-            const credits = window.AI_SENSEI
-                ? await withTimeout(AI_SENSEI.getCredits(), 8000).catch(() => ({
-                    total: 0, remaining: 0, used: 0, plan: 'free', error: true
-                  }))
-                : { total: 0, remaining: 0, used: 0, plan: 'free', error: true };
+            // Baca langsung dari Firestore tanpa lewat AI_SENSEI.getCredits()
+            // agar tidak tergantung state _isLoading di ai-sensei.js
+            const uid = window.AUTH?.user?.uid;
+            let credits = { total: 0, remaining: 0, used: 0, plan: 'free', error: true };
+            if (uid && typeof _fbDb !== 'undefined') {
+                try {
+                    const snap = await withTimeout(
+                        _fbDb.collection('users').doc(uid).get(), 6000
+                    );
+                    const d = snap.exists ? snap.data() : {};
+                    const aiCredits = d.aiCredits ?? 0;
+                    const aiUsage   = d.aiUsage   ?? 0;
+                    credits = {
+                        total:     aiCredits,
+                        remaining: aiCredits,
+                        used:      aiUsage,
+                        plan:      d.aiPlan ?? 'free',
+                        error:     false,
+                    };
+                    console.log('[AIC_PAGE] Credit loaded directly:', credits);
+                } catch (e) {
+                    console.error('[AIC_PAGE] Credit fetch error:', e.message);
+                }
+            }
 
             // Update header balance
             if (header) header.textContent = (credits.remaining ?? 0) + ' credit';
