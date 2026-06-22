@@ -876,29 +876,60 @@
    Page mengisi container alaminya di dalam <main>.
    ════════════════════════════════════════════════════════ */
 
-/* ── 1. Page: isi penuh container <main>, flex column ── */
+/* ══════════════════════════════════════════════════════════
+   CORE LAYOUT FIX
+   Rantai height harus terdefinisi agar flex children
+   bisa scroll dengan benar di mobile.
+   ══════════════════════════════════════════════════════════
+
+   #app (min-height: 100dvh → dikunci jadi height: 100dvh)
+    └── main.main-content (flex:1 → padding:0, overflow:hidden)
+         └── #page-ai-sensei (flex:1, min-height:0)
+              ├── .ais-header (flex-shrink:0)
+              ├── .ais-quick-wrap (flex-shrink:0)
+              ├── #ais-messages (flex:1, min-height:0, overflow-y:auto) ← HANYA ini scroll
+              └── .ais-input-wrap (flex-shrink:0) ← selalu di bawah
+   ══════════════════════════════════════════════════════════ */
+
+/* ── 0. Kunci #app ke 100dvh saat halaman AI aktif ──
+   Tanpa ini, #app hanya min-height sehingga height:100%
+   pada main/page tidak bisa resolve dengan benar di mobile. */
+#app.ais-app-lock {
+    height: 100dvh !important;
+    overflow: hidden !important;
+}
+
+/* ── 1. main: buang padding, jadikan flex column ── */
+main.ais-page-active {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    height: auto !important; /* biarkan flex tentukan tinggi */
+}
+
+/* ── 2. Page wrapper: flex:1 dengan min-height:0 ── */
 #page-ai-sensei {
     background: var(--bg-base, #0f0f13) !important;
     display: none;
     flex-direction: column;
-    /* Ambil tinggi penuh container — main sudah dikurangi header & bottom-nav */
-    height: 100%;
-    max-height: 100%;
+    flex: 1;
+    min-height: 0; /* KRITIS: tanpa ini flex child tidak bisa scroll */
     overflow: hidden;
-    /* Reset dari CSS sebelumnya */
     position: relative !important;
     top: auto !important; left: auto !important;
     right: auto !important; bottom: auto !important;
 }
-#page-ai-sensei.active { display: flex; }
-
-/* Pastikan .page.active tidak override dengan gap */
 #page-ai-sensei.active {
+    display: flex;
     gap: 0 !important;
     animation: none !important;
 }
 
-/* ── 2. Header: tetap di atas, tidak ikut scroll ── */
+/* ── 3. Header: tetap di atas ── */
 .ais-header {
     background: var(--bg-base, #0f0f13) !important;
     border-bottom: 1px solid var(--border, rgba(255,255,255,0.07)) !important;
@@ -907,25 +938,25 @@
     z-index: 5;
 }
 
-/* ── 3. Quick wrap: tidak ikut scroll ── */
+/* ── 4. Quick wrap: tidak ikut scroll ── */
 .ais-quick-wrap {
     flex-shrink: 0;
     background: var(--bg-base, #0f0f13);
 }
 
-/* ── 4. Messages: HANYA ini yang scroll ── */
+/* ── 5. Messages: HANYA ini yang scroll ──
+   flex:1 + min-height:0 = mengisi sisa ruang dan bisa scroll. */
 #ais-messages {
     flex: 1;
+    min-height: 0; /* KRITIS */
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
-    /* min-height: 0 penting untuk flex child dengan overflow */
-    min-height: 0;
 }
 
-/* ── 5. Input wrap: tetap di bawah, tidak ikut scroll ── */
+/* ── 6. Input wrap: selalu menempel di bawah ── */
 .ais-input-wrap {
     background: var(--bg-base, #0f0f13) !important;
     border-top: 1px solid var(--border, rgba(255,255,255,0.07)) !important;
@@ -935,21 +966,13 @@
     padding-bottom: max(12px, env(safe-area-inset-bottom));
 }
 
-/* ── 6. Layout main container — class di-inject via JS ── */
-main.ais-page-active {
-    display: flex !important;
-    flex-direction: column;
-    flex: 1;
-    overflow: hidden !important;
-    padding: 0 !important;
-    height: 100%;
-}
-
-/* ── 6. Scroll to Top Button ── */
-#ais-scroll-top {
+/* ── 6. Scroll Buttons — floating di atas #ais-messages ──
+   Keduanya absolute di dalam #page-ai-sensei (position:relative).
+   Disejajarkan secara vertikal (flex column) di kanan tengah. */
+#ais-scroll-top,
+#ais-scroll-bottom {
     position: absolute;
-    top: 72px; /* bawah header */
-    right: 14px;
+    right: 12px;
     width: 36px;
     height: 36px;
     border-radius: 50%;
@@ -966,9 +989,20 @@ main.ais-page-active {
     transform: scale(0.8);
     transition: opacity 0.2s, transform 0.2s;
     pointer-events: none;
-    z-index: 10;
+    z-index: 20;
 }
-#ais-scroll-top.visible {
+/* Scroll-up: mepet di bawah quick-wrap + header */
+#ais-scroll-top {
+    top: auto;
+    /* Dihitung dari #ais-messages via JS, tapi fallback CSS pakai positioning */
+    bottom: calc(72px + 44px + 8px); /* input-wrap + gap */
+}
+/* Scroll-down: tepat di atas input bar */
+#ais-scroll-bottom {
+    bottom: calc(72px + 8px); /* tinggi input-wrap ~72px + margin */
+}
+#ais-scroll-top.visible,
+#ais-scroll-bottom.visible {
     opacity: 1;
     transform: scale(1);
     pointer-events: auto;
@@ -1155,45 +1189,20 @@ main.ais-page-active {
 }
 
 /* ── Scroll to Bottom Button ── */
-#ais-scroll-bottom {
-    position: absolute;
-    bottom: 80px;
-    right: 14px;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: var(--bg-elevated, #23232f);
-    border: 1px solid var(--border-strong, rgba(255,255,255,0.14));
-    color: var(--text-primary, #f0f0f5);
-    font-size: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
-    opacity: 0;
-    transform: scale(0.8);
-    transition: opacity 0.2s, transform 0.2s;
-    pointer-events: none;
-    z-index: 10;
-}
-#ais-scroll-bottom.visible {
-    opacity: 1;
-    transform: scale(1);
-    pointer-events: auto;
-}
+/* #ais-scroll-bottom sudah didefinisikan di blok scroll buttons di atas */
 [data-theme="light"] #ais-scroll-bottom {
     background: var(--bg-surface, #fff);
     border-color: var(--border-strong, rgba(0,0,0,0.13));
     color: var(--text-primary, #1a1a2e);
 }
 
-/* ── AI Credit page desktop fix ── */
+/* ── AI Credit page: sama seperti ai-sensei, gunakan flex layout ── */
 #page-ai-credit {
     position: relative !important;
     top: auto !important; left: auto !important;
-    height: 100%;
-    max-height: 100%;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
 }
 #page-ai-credit.active {
     display: flex !important;
@@ -1201,7 +1210,6 @@ main.ais-page-active {
     gap: 0 !important;
     animation: none !important;
 }
-/* ai-credit: same main.ais-page-active class */
 .aic-scroll { flex: 1; overflow-y: auto; min-height: 0; }
 
 /* ════════════════════════════════════════════════════════

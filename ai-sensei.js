@@ -976,12 +976,29 @@ ${
         // ── Scroll buttons: top & bottom ──
         const scrollTopBtn  = document.getElementById('ais-scroll-top');
         const scrollBotBtn  = document.getElementById('ais-scroll-bottom');
+
+        // Posisikan tombol scroll secara dinamis berdasarkan layout nyata
+        const _positionScrollBtns = () => {
+            const inputWrap = document.querySelector('.ais-input-wrap');
+            const page      = document.getElementById('page-ai-sensei');
+            if (!page || !inputWrap) return;
+            const pageH     = page.getBoundingClientRect().height;
+            const inputH    = inputWrap.getBoundingClientRect().height;
+            const inputTop  = page.getBoundingClientRect().bottom - inputWrap.getBoundingClientRect().bottom;
+            // scroll-down: tepat di atas input wrap
+            const botOffset = inputH + inputTop + 8;
+            // scroll-up: 8px di atas scroll-down button
+            const topOffset = botOffset + 44; // 44 = button height + gap
+            if (scrollBotBtn) scrollBotBtn.style.bottom = botOffset + 'px';
+            if (scrollTopBtn) scrollTopBtn.style.bottom = topOffset + 'px';
+        };
+
         if (container) {
             const _updateScrollBtns = () => {
                 const fromTop    = container.scrollTop;
                 const fromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-                if (scrollTopBtn) scrollTopBtn.classList.toggle('visible', fromTop > 200);
-                if (scrollBotBtn) scrollBotBtn.classList.toggle('visible', fromBottom > 100);
+                if (scrollTopBtn) scrollTopBtn.classList.toggle('visible', fromTop > 100);
+                if (scrollBotBtn) scrollBotBtn.classList.toggle('visible', fromBottom > 60);
             };
             container.addEventListener('scroll', _updateScrollBtns, _sig);
             if (scrollTopBtn) {
@@ -994,8 +1011,11 @@ ${
                     container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
                 }, _sig);
             }
-            // Initial state
-            _updateScrollBtns();
+            // Posisikan tombol dan update state awal
+            requestAnimationFrame(() => {
+                _positionScrollBtns();
+                _updateScrollBtns();
+            });
         }
 
         // ── Tombol riwayat chat ──

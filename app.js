@@ -6089,6 +6089,13 @@ function navigateTo(page) {
     document.querySelectorAll('.page').forEach(p => {
         p.classList.toggle('active', p.id === 'page-' + page);
     });
+
+    // ── AI LAYOUT LOCK: fix tinggi viewport untuk halaman AI ──
+    // Tanpa ini, #page-ai-sensei tidak bisa full-height di mobile
+    // karena #app hanya min-height (bukan height) 100dvh.
+    const _isAiPage = page === 'ai-sensei' || page === 'ai-credit';
+    document.getElementById('app')?.classList.toggle('ais-app-lock', _isAiPage);
+    document.querySelector('main')?.classList.toggle('ais-page-active', _isAiPage);
     // ── AI Credit Page ──
     if (page === 'ai-credit') {
         requestAnimationFrame(() => {
@@ -6098,10 +6105,6 @@ function navigateTo(page) {
 
     // ── AI Sensei: feature flag + init saat halaman dibuka ──
     if (page === 'ai-sensei') {
-        // Set nav active dulu sebelum async check
-        document.querySelectorAll('.nav-item').forEach(n => {
-            n.classList.toggle('active', n.dataset.page === 'ai-sensei');
-        });
         // Cek akses dulu sebelum render
         if (window.AI_FLAG) {
             AI_FLAG.checkAccess().then(result => {
@@ -6126,7 +6129,7 @@ function navigateTo(page) {
                 if (window.AI_SENSEI) AI_SENSEI.init();
             });
         }
-        return; // early return — init dihandle async di atas
+        return; // early return — nav active dihandle async di atas atau oleh checkAccess
     }
     document.querySelectorAll('.nav-item').forEach(n => {
         n.classList.toggle('active', n.dataset.page === page);
