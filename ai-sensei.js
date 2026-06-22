@@ -41,7 +41,6 @@ const AI_SENSEI = (() => {
     let _isLoading    = false;
     let _creditsCache = null; // cache supaya tidak spam Firestore
     let _evAbort      = null; // AbortController untuk event listeners — cegah duplikat
-    let _isSending     = false; // guard handleSend — terpisah dari _isLoading milik ask()
 
     // ─────────────────────────────────────────────────────
     // CREDIT MANAGER
@@ -813,10 +812,13 @@ ${
         const inp = document.getElementById('ais-input');
         if (!inp) return;
         const msg = inp.value.trim();
-        if (!msg || _isSending) return; // _isSending: guard handleSend (bukan _isLoading milik ask)
+        if (!msg || _isLoading) return;
 
-        // ── ANTI-DUPLIKAT: set SEBELUM await apapun ──
-        _isSending = true;
+        // ── KUNCI ANTI-DUPLIKAT ──
+        // Set _isLoading dan clear input SEBELUM await apapun.
+        // Tanpa ini, await getCredits() (~300ms) memberi celah
+        // bagi klik/trigger kedua untuk lolos masuk.
+        _isLoading = true;
         inp.value = '';
         inp.style.height = 'auto';
         _setInputDisabled(true);
@@ -828,7 +830,7 @@ ${
         const credits = await getCredits();
         if (!credits.isGuest && !credits.error && credits.remaining < cost) {
             // Credit tidak cukup — reset state dan tampilkan popup
-            _isSending = false;
+            _isLoading = false;
             _setInputDisabled(false);
             inp.value = msg; // kembalikan pesan ke input
             _showCreditPopup(cost, credits.remaining);
@@ -846,7 +848,6 @@ ${
         const result = await ask(msg, cost);
 
         hideLoading();
-        _isSending = false; // selalu reset setelah selesai
         _setInputDisabled(false);
         inp.focus();
 
@@ -1036,7 +1037,7 @@ ${
         claimWelcomeBonus,
         adminAddCredit,
         adminAddCreditByMemberId,
-        detectFeature: _detectFeature,,
+        detectFeature: _detectFeature,
         // Untuk AI_HISTORY
         pushHistory: (msg) => { _chatHistory.push(msg); },
     };

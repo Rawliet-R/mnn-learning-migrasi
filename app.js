@@ -6098,6 +6098,10 @@ function navigateTo(page) {
 
     // ── AI Sensei: feature flag + init saat halaman dibuka ──
     if (page === 'ai-sensei') {
+        // Set nav active dulu sebelum async check
+        document.querySelectorAll('.nav-item').forEach(n => {
+            n.classList.toggle('active', n.dataset.page === 'ai-sensei');
+        });
         // Cek akses dulu sebelum render
         if (window.AI_FLAG) {
             AI_FLAG.checkAccess().then(result => {
@@ -6122,7 +6126,7 @@ function navigateTo(page) {
                 if (window.AI_SENSEI) AI_SENSEI.init();
             });
         }
-        return; // early return — nav active dihandle async di atas atau oleh checkAccess
+        return; // early return — init dihandle async di atas
     }
     document.querySelectorAll('.nav-item').forEach(n => {
         n.classList.toggle('active', n.dataset.page === page);
