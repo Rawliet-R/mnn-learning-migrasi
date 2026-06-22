@@ -201,10 +201,18 @@ const AI_SENSEI = (() => {
                 aiPlan    = 'premium';
             }
 
-            const remaining = Math.max(0, aiCredits - (aiUsage || 0));
+            // [FIX PC-1] Model kredit yang benar:
+            // - aiCredits  = saldo tersisa (berkurang setiap deductCredit)
+            // - aiUsage    = statistik akumulasi (hanya naik, tidak mempengaruhi remaining)
+            // - remaining  = aiCredits langsung (BUKAN aiCredits - aiUsage)
+            // - total      = aiCredits + aiUsage (rekonstruksi alokasi awal untuk progress bar)
+            const safeUsage = Math.max(0, aiUsage || 0);
+            const remaining = Math.max(0, aiCredits);
+            const total     = aiCredits + safeUsage; // alokasi awal = sisa + yang sudah terpakai
+
             _creditsCache = {
-                total:     aiCredits,
-                used:      aiUsage || 0,
+                total,
+                used:      safeUsage,
                 remaining,
                 plan:      aiPlan,
                 lastReset: aiCreditReset,
@@ -224,8 +232,14 @@ const AI_SENSEI = (() => {
     }
 
     /**
-     * Kurangi 1 kredit setelah AI menjawab.
-     * Menggunakan FieldValue.increment(-1) agar atomic.
+     * Kurangi kredit setelah AI menjawab.
+     * Menggunakan FieldValue.increment(-n) agar atomic.
+     *
+     * [FIX PC-1] Model kredit baru:
+     * - aiCredits berkurang (saldo tersisa)
+     * - aiUsage bertambah (statistik, tidak mempengaruhi remaining)
+     * - _creditsCache.total TIDAK dikurangi (total = alokasi awal, bersifat tetap)
+     *
      * Return: sisa kredit baru
      */
     async function deductCredit(amount = 1) {
@@ -234,13 +248,13 @@ const AI_SENSEI = (() => {
         const safeAmount = Math.max(1, Math.floor(amount));
         try {
             await ref.set({
-                aiCredits: _increment(-safeAmount),
-                aiUsage:   _increment(safeAmount),
+                aiCredits: _increment(-safeAmount),  // saldo berkurang
+                aiUsage:   _increment(safeAmount),   // statistik naik
             }, { merge: true });
             if (_creditsCache) {
                 _creditsCache.used      = (_creditsCache.used || 0) + safeAmount;
                 _creditsCache.remaining = Math.max(0, _creditsCache.remaining - safeAmount);
-                _creditsCache.total     = Math.max(0, (_creditsCache.total || safeAmount) - safeAmount);
+                // [FIX PC-1] total TIDAK diubah — merepresentasikan alokasi awal bulan ini
             }
             console.log('[AI_CREDIT] Kredit dikurangi', safeAmount, '. Sisa:', _creditsCache?.remaining);
             return _creditsCache?.remaining ?? 0;
@@ -397,32 +411,34 @@ const AI_SENSEI = (() => {
             return { success: false, error: 'Silakan login terlebih dahulu untuk menggunakan AI Sensei.' };
         }
 
+        // [FIX AR-1] _isLoading=true SEBELUM await apapun — menutup race window
+        // sehingga dua panggilan ask() paralel tidak bisa lolos bersamaan.
+        _isLoading = true;
+
         // Cek kredit
         const credits = await getCredits();
 
         if (credits.isGuest) {
+            _isLoading = false;
             return { success: false, error: 'Silakan login untuk menggunakan AI Sensei.' };
         }
         if (credits.error) {
             // Jangan block — log error tapi tetap izinkan (fail-open untuk UX)
-            // Ubah ke fail-closed jika ingin strict: return { success: false, error: '...' }
+            // Ubah ke fail-closed jika ingin strict: _isLoading = false; return { success: false, error: '...' }
             console.warn('[AI_CREDIT] getCredits error saat ask(), lanjutkan tanpa cek kredit:', credits.errMsg);
         }
         if (!credits.error && credits.remaining <= 0) {
+            _isLoading = false;
             const isPrem = typeof isPremiumUser === 'function' && isPremiumUser();
             return {
                 success: false,
-                error: `Kredit AI Sensei kamu habis bulan ini. Kredit gratis direset setiap bulan.
-
-${
+                error: `Kredit AI Sensei kamu habis bulan ini. Kredit gratis direset setiap bulan.\n\n${
                     !isPrem
                         ? '✨ Upgrade ke Premium untuk mendapat lebih banyak kredit!'
                         : 'Kredit akan direset di awal bulan depan.'
                 }`
             };
         }
-
-        _isLoading = true;
 
         // Tambah ke history
         _chatHistory.push({ role: 'user', content: userMessage.trim() });
@@ -446,9 +462,31 @@ ${
                 /[\u0080-\uFFFF]/g,
                 ch => '\\u' + ('0000' + ch.charCodeAt(0).toString(16)).slice(-4)
             );
+
+            // [FIX KM-1] Ambil Firebase ID Token untuk autentikasi proxy.
+            // Proxy akan menolak request tanpa token yang valid (HTTP 401).
+            let idToken = '';
+            try {
+                const currentUser = firebase.auth().currentUser;
+                if (currentUser) {
+                    idToken = await currentUser.getIdToken();
+                }
+            } catch (tokenErr) {
+                console.warn('[AI_SENSEI] Gagal ambil ID token:', tokenErr.message);
+            }
+
+            if (!idToken) {
+                _isLoading = false;
+                if (_chatHistory[_chatHistory.length - 1]?.role === 'user') _chatHistory.pop();
+                return { success: false, error: 'Sesi login tidak valid. Silakan login ulang.' };
+            }
+
             const res = await fetch('/api/ai-proxy', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + idToken,  // [FIX KM-1] wajib ada
+                },
                 body: _safePayload
             });
 
