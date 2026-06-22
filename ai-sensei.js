@@ -750,7 +750,13 @@ ${
         }
 
         container.appendChild(bubble);
-        bubble.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        // Scroll ke bawah — gunakan container.scrollTop untuk performa lebih baik
+        const _msgCont = document.getElementById('ais-messages');
+        if (_msgCont) {
+            requestAnimationFrame(() => {
+                _msgCont.scrollTop = _msgCont.scrollHeight;
+            });
+        }
         return bubble;
     }
 
@@ -956,6 +962,17 @@ ${
         const container = document.getElementById('ais-messages');
         if (container && container.children.length === 0) {
             _appendWelcomeMessage();
+        }
+
+        // ── Scroll to top button ──
+        const scrollTopBtn = document.getElementById('ais-scroll-top');
+        if (container && scrollTopBtn) {
+            container.addEventListener('scroll', () => {
+                scrollTopBtn.classList.toggle('visible', container.scrollTop > 200);
+            }, _sig);
+            scrollTopBtn.addEventListener('click', () => {
+                container.scrollTo({ top: 0, behavior: 'smooth' });
+            }, _sig);
         }
     }
 

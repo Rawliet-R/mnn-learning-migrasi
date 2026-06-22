@@ -869,3 +869,275 @@
     border-radius: 99px;
     cursor: pointer;
 }
+
+/* ════════════════════════════════════════════════════════
+   UI FIX — Layout Fixed + Light Mode + Scroll UX
+   ════════════════════════════════════════════════════════ */
+
+/* ── 1. Page: fixed layout agar header & input tidak ikut scroll ── */
+#page-ai-sensei {
+    /* Override: pakai CSS variables dari app */
+    background: var(--bg-base, #0f0f13) !important;
+    /* Fixed column layout — header top, input bottom, messages tengah */
+    display: none;
+    flex-direction: column;
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    right: 0;
+    /* Beri ruang untuk bottom nav (~60px) */
+    bottom: 60px;
+    height: auto !important;
+    max-height: none !important;
+    overflow: hidden;
+    z-index: 10;
+}
+#page-ai-sensei.active { display: flex; }
+
+/* ── 2. Header: sticky top ── */
+.ais-header {
+    background: var(--bg-base, #0f0f13) !important;
+    border-bottom: 1px solid var(--border, rgba(255,255,255,0.07)) !important;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+/* ── 3. Quick wrap: tidak scroll bersama messages ── */
+.ais-quick-wrap {
+    flex-shrink: 0;
+    background: var(--bg-base, #0f0f13);
+}
+
+/* ── 4. Messages: hanya area ini yang scroll ── */
+#ais-messages {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    /* Penting: pastikan ini yang scroll, bukan parent */
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+}
+
+/* ── 5. Input wrap: sticky bottom ── */
+.ais-input-wrap {
+    background: var(--bg-base, #0f0f13) !important;
+    border-top: 1px solid var(--border, rgba(255,255,255,0.07)) !important;
+    flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    /* Safe area keyboard iOS */
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+/* ── 6. Scroll to Top Button ── */
+#ais-scroll-top {
+    position: absolute;
+    top: 72px; /* bawah header */
+    right: 14px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--bg-elevated, #23232f);
+    border: 1px solid var(--border-strong, rgba(255,255,255,0.14));
+    color: var(--text-primary, #f0f0f5);
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    opacity: 0;
+    transform: scale(0.8);
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+    z-index: 10;
+}
+#ais-scroll-top.visible {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+}
+
+/* ════════════════════════════════════════════════════════
+   LIGHT MODE — semua komponen AI Sensei
+   Selector: [data-theme="light"] (sesuai app)
+   ════════════════════════════════════════════════════════ */
+[data-theme="light"] #page-ai-sensei,
+[data-theme="light"] .ais-header,
+[data-theme="light"] .ais-quick-wrap,
+[data-theme="light"] .ais-input-wrap {
+    background: var(--bg-base, #f5f5f7) !important;
+}
+
+[data-theme="light"] .ais-header {
+    border-bottom-color: var(--border, rgba(0,0,0,0.07)) !important;
+}
+
+[data-theme="light"] .ais-header-title {
+    color: var(--text-primary, #1a1a2e);
+}
+
+[data-theme="light"] #ais-credit-remaining {
+    color: var(--text-primary, #1a1a2e);
+}
+
+[data-theme="light"] .ais-credit-track {
+    background: rgba(0,0,0,0.08);
+}
+
+[data-theme="light"] #ais-new-chat-btn,
+[data-theme="light"] .aic-header-link {
+    background: rgba(108,99,255,0.08);
+    color: #5a54e0;
+    border-color: rgba(108,99,255,0.2);
+}
+
+[data-theme="light"] .ais-quick-btn {
+    background: var(--bg-surface, #ffffff);
+    border-color: var(--border-strong, rgba(0,0,0,0.13));
+    color: var(--text-primary, #1a1a2e);
+}
+
+[data-theme="light"] .ais-quick-btn.ais-quick-roleplay {
+    background: rgba(108,99,255,0.06);
+    border-color: rgba(108,99,255,0.2);
+    color: #5a54e0;
+}
+
+[data-theme="light"] #ais-messages {
+    background: var(--bg-base, #f5f5f7);
+}
+
+[data-theme="light"] .ais-welcome-title {
+    color: var(--text-primary, #1a1a2e);
+}
+
+[data-theme="light"] .ais-welcome-sub {
+    color: var(--text-secondary, #5a5a7a);
+}
+
+[data-theme="light"] .ais-bubble-user {
+    background: linear-gradient(135deg, #5a54e0 0%, #6c63ff 100%);
+    color: #fff;
+}
+
+[data-theme="light"] .ais-bubble-ai {
+    background: var(--bg-surface, #ffffff);
+    border-color: var(--border, rgba(0,0,0,0.07));
+    color: var(--text-primary, #1a1a2e);
+}
+
+[data-theme="light"] .ais-bubble-ai strong { color: #5a54e0; }
+[data-theme="light"] .ais-bubble-ai em     { color: #2a8f6f; }
+
+[data-theme="light"] .ais-bubble-error {
+    background: rgba(220,50,50,0.06);
+    border-color: rgba(220,50,50,0.15);
+    color: #b32020;
+}
+
+[data-theme="light"] .ais-loading span {
+    background: rgba(0,0,0,0.2);
+}
+
+[data-theme="light"] .ais-cost-badge {
+    background: var(--bg-card, #ffffff);
+    border-color: var(--border, rgba(0,0,0,0.07));
+    color: var(--text-secondary, #5a5a7a);
+}
+
+[data-theme="light"] #ais-input {
+    background: var(--bg-surface, #ffffff);
+    border-color: var(--border-strong, rgba(0,0,0,0.13));
+    color: var(--text-primary, #1a1a2e);
+}
+
+[data-theme="light"] #ais-input::placeholder {
+    color: var(--text-secondary, #9898b4);
+}
+
+[data-theme="light"] #ais-input:focus {
+    border-color: rgba(108,99,255,0.4);
+    background: #fff;
+}
+
+/* AI Credit page — light mode */
+[data-theme="light"] #page-ai-credit {
+    background: var(--bg-base, #f5f5f7) !important;
+}
+
+[data-theme="light"] .ais-header {
+    background: var(--bg-base, #f5f5f7) !important;
+}
+
+[data-theme="light"] .aic-scroll {
+    background: var(--bg-base, #f5f5f7);
+}
+
+[data-theme="light"] .aic-card {
+    background: var(--bg-surface, #ffffff);
+    border-color: var(--border, rgba(0,0,0,0.07));
+}
+
+[data-theme="light"] .aic-section-title {
+    color: var(--text-secondary, #5a5a7a);
+}
+
+[data-theme="light"] .aic-balance-num,
+[data-theme="light"] .aic-balance-label,
+[data-theme="light"] .aic-balance-meta,
+[data-theme="light"] .aic-log-feature {
+    color: var(--text-primary, #1a1a2e);
+}
+
+[data-theme="light"] .aic-log-date,
+[data-theme="light"] .aic-bonus-sub,
+[data-theme="light"] .aic-pkg-note {
+    color: var(--text-secondary, #5a5a7a);
+}
+
+[data-theme="light"] .aic-log-row {
+    border-bottom-color: var(--border, rgba(0,0,0,0.06));
+}
+
+[data-theme="light"] .aic-balance-track {
+    background: rgba(0,0,0,0.08);
+}
+
+[data-theme="light"] .aic-pkg-card {
+    background: var(--bg-surface, #fff);
+    border-color: var(--border-strong, rgba(0,0,0,0.13));
+}
+
+[data-theme="light"] .aic-pkg-credits { color: var(--text-primary, #1a1a2e); }
+
+[data-theme="light"] .aic-admin-input {
+    background: var(--bg-surface, #fff);
+    border-color: var(--border-strong, rgba(0,0,0,0.13));
+    color: var(--text-primary, #1a1a2e);
+}
+
+[data-theme="light"] .ais-popup-box {
+    background: var(--bg-surface, #ffffff);
+    border-color: var(--border, rgba(0,0,0,0.07));
+}
+
+[data-theme="light"] .ais-popup-title { color: var(--text-primary, #1a1a2e); }
+[data-theme="light"] .ais-popup-body  { color: var(--text-secondary, #5a5a7a); }
+[data-theme="light"] .ais-popup-sub   { color: var(--text-secondary, #9898b4); }
+
+[data-theme="light"] .ais-popup-btn-secondary {
+    background: rgba(0,0,0,0.04);
+    border-color: var(--border, rgba(0,0,0,0.1));
+    color: var(--text-secondary, #5a5a7a);
+}
+
+[data-theme="light"] #ais-scroll-top {
+    background: var(--bg-surface, #fff);
+    border-color: var(--border-strong, rgba(0,0,0,0.13));
+    color: var(--text-primary, #1a1a2e);
+}
