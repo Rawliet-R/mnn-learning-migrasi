@@ -306,7 +306,7 @@ const AI_CREDIT_PAGE = (() => {
         overlay.innerHTML =
             '<div class="aic-qris-zoom-inner">' +
             '<img src="/qris.jpeg" alt="QRIS" class="aic-qris-zoom-img">' +
-            '<button class="aic-qris-zoom-close" onclick="document.getElementById('aic-qris-zoom').remove()">&#x2715; Tutup</button>' +
+            '<button class="aic-qris-zoom-close" onclick="document.getElementById(\'aic-qris-zoom\').remove()">&#x2715; Tutup</button>' +
             '</div>';
         overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
         document.body.appendChild(overlay);

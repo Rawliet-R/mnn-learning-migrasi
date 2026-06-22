@@ -39,6 +39,7 @@ const AI_SENSEI = (() => {
     // ── State chat ──
     let _chatHistory  = [];   // [{role, content}, ...]
     let _isLoading    = false;
+    let _sendLock     = false; // Anti-duplikat di handleSend sebelum ask()
     let _creditsCache = null; // cache supaya tidak spam Firestore
     let _evAbort      = null; // AbortController untuk event listeners — cegah duplikat
 
@@ -812,13 +813,13 @@ ${
         const inp = document.getElementById('ais-input');
         if (!inp) return;
         const msg = inp.value.trim();
-        if (!msg || _isLoading) return;
+        if (!msg || _isLoading || _sendLock) return;
 
         // ── KUNCI ANTI-DUPLIKAT ──
-        // Set _isLoading dan clear input SEBELUM await apapun.
-        // Tanpa ini, await getCredits() (~300ms) memberi celah
-        // bagi klik/trigger kedua untuk lolos masuk.
-        _isLoading = true;
+        // _sendLock mencegah double-call selama await getCredits() ~300ms.
+        // JANGAN set _isLoading di sini — ask() mengeceknya di awal
+        // dan akan langsung return error jika sudah true!
+        _sendLock = true;
         inp.value = '';
         inp.style.height = 'auto';
         _setInputDisabled(true);
@@ -830,7 +831,7 @@ ${
         const credits = await getCredits();
         if (!credits.isGuest && !credits.error && credits.remaining < cost) {
             // Credit tidak cukup — reset state dan tampilkan popup
-            _isLoading = false;
+            _sendLock = false;
             _setInputDisabled(false);
             inp.value = msg; // kembalikan pesan ke input
             _showCreditPopup(cost, credits.remaining);
@@ -847,6 +848,7 @@ ${
         // Kirim ke AI
         const result = await ask(msg, cost);
 
+        _sendLock = false;
         hideLoading();
         _setInputDisabled(false);
         inp.focus();
