@@ -1015,11 +1015,11 @@ main.ais-page-active {
 #ais-scroll-top {
     top: auto;
     /* Dihitung dari #ais-messages via JS, tapi fallback CSS pakai positioning */
-    bottom: calc(72px + 64px); /* input-wrap + gap + scroll-down height */
+    bottom: calc(72px + 100px); /* input-wrap + gap + scroll-down height */
 }
 /* Scroll-down: tepat di atas input bar */
 #ais-scroll-bottom {
-    bottom: calc(72px + 20px); /* input-wrap ~72px + margin lebih lapang */
+    bottom: calc(72px + 56px); /* input-wrap ~72px + margin cukup lapang */
 }
 #ais-scroll-top.visible,
 #ais-scroll-bottom.visible {

@@ -985,10 +985,10 @@ ${
             const pageH     = page.getBoundingClientRect().height;
             const inputH    = inputWrap.getBoundingClientRect().height;
             const inputTop  = page.getBoundingClientRect().bottom - inputWrap.getBoundingClientRect().bottom;
-            // scroll-down: tepat di atas input wrap
-            const botOffset = inputH + inputTop + 8;
-            // scroll-up: 8px di atas scroll-down button
-            const topOffset = botOffset + 44; // 44 = button height + gap
+            // scroll-down: di atas input wrap dengan margin cukup
+            const botOffset = inputH + inputTop + 24;
+            // scroll-up: 52px di atas scroll-down button (36px tinggi + 16px gap)
+            const topOffset = botOffset + 52; // 44 = button height + gap
             if (scrollBotBtn) scrollBotBtn.style.bottom = botOffset + 'px';
             if (scrollTopBtn) scrollTopBtn.style.bottom = topOffset + 'px';
         };
