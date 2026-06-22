@@ -897,6 +897,20 @@
 #app.ais-app-lock {
     height: 100dvh !important;
     overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+/* FIX: .app-main-col harus jadi flex container di mobile agar
+   rantai flex #app → .app-main-col → main → page bisa bekerja.
+   Tanpa ini, main.ais-page-active { flex:1 } tidak ada efeknya
+   karena parent (.app-main-col) bukan flex container di mobile. */
+#app.ais-app-lock > .app-main-col {
+    flex: 1 !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
 }
 
 /* ── 1. main: buang padding, jadikan flex column ── */
@@ -918,6 +932,8 @@ main.ais-page-active {
     flex-direction: column;
     flex: 1;
     min-height: 0; /* KRITIS: tanpa ini flex child tidak bisa scroll */
+    height: auto !important;    /* FIX: override height:100dvh dari blok awal */
+    max-height: none !important; /* FIX: override max-height:100dvh dari blok awal */
     overflow: hidden;
     position: relative !important;
     top: auto !important; left: auto !important;
@@ -960,10 +976,11 @@ main.ais-page-active {
 .ais-input-wrap {
     background: var(--bg-base, #0f0f13) !important;
     border-top: 1px solid var(--border, rgba(255,255,255,0.07)) !important;
-    flex-shrink: 0;
+    flex-shrink: 0 !important;
     position: relative;
-    z-index: 5;
-    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    z-index: 95; /* FIX: di atas bottom-nav (z-index:90) agar tidak tertutup */
+    padding: 10px 16px !important;
+    padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
 }
 
 /* ── 6. Scroll Buttons — floating di atas #ais-messages ──
@@ -1200,17 +1217,26 @@ main.ais-page-active {
 #page-ai-credit {
     position: relative !important;
     top: auto !important; left: auto !important;
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
+    flex: 1 !important;
+    min-height: 0 !important;
+    height: auto !important;      /* FIX: override height:100dvh dari blok awal */
+    max-height: none !important;
+    overflow: hidden !important;
 }
 #page-ai-credit.active {
     display: flex !important;
-    flex-direction: column;
+    flex-direction: column !important;
     gap: 0 !important;
     animation: none !important;
 }
-.aic-scroll { flex: 1; overflow-y: auto; min-height: 0; }
+.aic-scroll {
+    flex: 1 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+}
 
 /* ════════════════════════════════════════════════════════
    CHAT HISTORY DRAWER
