@@ -4497,10 +4497,41 @@ _fbAuth.onAuthStateChanged(async fbUser => {
                     const restored = PROGRESS_SYNC.pull(data);
                     if (restored) console.log('[PROGRESS_SYNC] Progress restored from cloud backup');
                 } catch(psErr) { console.warn('[PROGRESS_SYNC] pull error:', psErr.message); }
+
+                // ── BACKFILL: email & createdAt (read by MNN Admin Center) ──────────
+                // users/{uid} historically only ever got partial fields merged in, so
+                // many docs are missing `email`/`createdAt` for the admin panel to read.
+                // Fill in ONLY whichever of those two is missing — isPremium, memberId,
+                // and role are never touched here. Fire-and-forget: never blocks app entry.
+                (function backfillAdminFields() {
+                    const need = {};
+                    if (!data.email) need.email = fbUser.email || '';
+                    if (!data.createdAt) {
+                        const created = fbUser.metadata?.creationTime ? new Date(fbUser.metadata.creationTime) : new Date();
+                        need.createdAt = firebase.firestore.Timestamp.fromDate(created);
+                    }
+                    if (Object.keys(need).length > 0) {
+                        _fbDb.collection('users').doc(fbUser.uid).set(need, { merge: true })
+                            .then(() => console.log('[AUTH] BACKFILL_OK —', Object.keys(need).join(', ')))
+                            .catch(e => console.warn('[AUTH] BACKFILL_FAIL —', e.message));
+                    }
+                })();
             } else {
                 console.warn('[AUTH] FIRESTORE FETCH DONE — doc not found, isPremium = false');
                 console.log('[FIRESTORE_SOURCE_OF_TRUTH] Doc not found — writing isPremium: false | uid:', fbUser.uid);
                 AUTH.user.isPremium = false;
+
+                // ── BACKFILL: email & createdAt for users with no Firestore doc yet ──
+                // Same intent as above — just no existing doc to check, so always write.
+                (function backfillAdminFields() {
+                    const created = fbUser.metadata?.creationTime ? new Date(fbUser.metadata.creationTime) : new Date();
+                    _fbDb.collection('users').doc(fbUser.uid).set({
+                        email: fbUser.email || '',
+                        createdAt: firebase.firestore.Timestamp.fromDate(created)
+                    }, { merge: true })
+                        .then(() => console.log('[AUTH] BACKFILL_OK —', 'email, createdAt (new doc)'))
+                        .catch(e => console.warn('[AUTH] BACKFILL_FAIL —', e.message));
+                })();
             }
         } catch (fsErr) {
             console.error('[AUTH] FIRESTORE FETCH GAGAL:', fsErr.message, '— fallback isPremium = false');
