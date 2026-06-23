@@ -775,6 +775,116 @@ const AI_SENSEI = (() => {
         }
     }
 
+    // ─────────────────────────────────────────────────────
+    // ADMIN — SET CREDIT (ke nilai tertentu, bukan tambah)
+    // ─────────────────────────────────────────────────────
+
+    /**
+     * Set credit user ke nilai tertentu (override, bukan increment).
+     * Berguna untuk koreksi credit yang terlanjur salah.
+     * Hanya bisa dipanggil jika role = "admin".
+     * @param {string} targetUid
+     * @param {number} amount - nilai kredit baru (harus >= 0)
+     */
+    async function adminSetCredit(targetUid, amount) {
+        if (window.AUTH?.user?.role !== 'admin') {
+            return { success: false, error: 'Hanya admin yang bisa melakukan ini.' };
+        }
+        if (!targetUid || typeof amount !== 'number' || amount < 0) {
+            return { success: false, error: 'UID dan jumlah credit tidak valid (harus >= 0).' };
+        }
+        if (typeof _fbDb === 'undefined') {
+            return { success: false, error: 'Firestore tidak tersedia.' };
+        }
+        try {
+            const targetRef = _fbDb.collection('users').doc(targetUid);
+            const snap = await targetRef.get();
+            if (!snap.exists) return { success: false, error: 'User tidak ditemukan.' };
+
+            const creditSebelum = snap.data().aiCredits ?? 0;
+
+            await targetRef.set({ aiCredits: amount }, { merge: true });
+
+            console.log('[ADMIN] Credit di-set:', creditSebelum, '->', amount, '| uid:', targetUid);
+
+            try {
+                await _fbDb.collection('creditTransactions').add({
+                    uid:           targetUid,
+                    amount:        amount,
+                    amountBefore:  creditSebelum,
+                    type:          'admin_set',
+                    adminUid:      window.AUTH.user.uid,
+                    createdAt:     firebase.firestore.FieldValue.serverTimestamp(),
+                });
+            } catch (logErr) {
+                console.warn('[ADMIN] Log transaksi gagal (credit tetap di-set):', logErr.message);
+            }
+
+            invalidateCache();
+            return { success: true, creditSebelum, creditSesudah: amount };
+        } catch (e) {
+            console.error('[ADMIN] adminSetCredit error:', e.message);
+            return { success: false, error: e.message };
+        }
+    }
+
+    /**
+     * Set credit user ke nilai tertentu berdasarkan MemberId (MNN-XXXXXX).
+     * @param {string} memberId - contoh: "MNN-849622"
+     * @param {number} amount - nilai kredit baru (harus >= 0)
+     */
+    async function adminSetCreditByMemberId(memberId, amount) {
+        if (window.AUTH?.user?.role !== 'admin') {
+            return { success: false, error: 'Hanya admin yang bisa melakukan ini.' };
+        }
+        if (!memberId || typeof amount !== 'number' || amount < 0) {
+            return { success: false, error: 'MNN-ID dan jumlah tidak valid (harus >= 0).' };
+        }
+        if (typeof _fbDb === 'undefined') {
+            return { success: false, error: 'Firestore tidak tersedia.' };
+        }
+        try {
+            const snap = await _fbDb.collection('users')
+                .where('memberId', '==', memberId.trim().toUpperCase())
+                .limit(1)
+                .get();
+
+            if (snap.empty) {
+                return { success: false, error: 'MNN-ID tidak ditemukan: ' + memberId };
+            }
+
+            const userDoc      = snap.docs[0];
+            const targetUid    = userDoc.id;
+            const email        = userDoc.data().email || '-';
+            const creditSebelum = userDoc.data().aiCredits ?? 0;
+
+            await userDoc.ref.set({ aiCredits: amount }, { merge: true });
+
+            console.log('[ADMIN] Credit di-set:', creditSebelum, '->', amount,
+                        '| memberId:', memberId, '| uid:', targetUid);
+
+            try {
+                await _fbDb.collection('creditTransactions').add({
+                    uid:           targetUid,
+                    memberId:      memberId.trim().toUpperCase(),
+                    amount:        amount,
+                    amountBefore:  creditSebelum,
+                    type:          'admin_set',
+                    adminUid:      window.AUTH.user.uid,
+                    createdAt:     firebase.firestore.FieldValue.serverTimestamp(),
+                });
+            } catch (logErr) {
+                console.warn('[ADMIN] Log transaksi gagal (credit tetap di-set):', logErr.message);
+            }
+
+            invalidateCache();
+            return { success: true, targetUid, email, creditSebelum, creditSesudah: amount };
+        } catch (e) {
+            console.error('[ADMIN] adminSetCreditByMemberId error:', e.message);
+            return { success: false, error: e.message };
+        }
+    }
+
     /** Reset chat history (tombol "Chat Baru") */
     function resetChat() {
         _chatHistory = [];
@@ -1196,6 +1306,8 @@ const AI_SENSEI = (() => {
         claimPremiumUpgradeBonus,
         adminAddCredit,
         adminAddCreditByMemberId,
+        adminSetCredit,
+        adminSetCreditByMemberId,
         detectFeature: _detectFeature,
         // Untuk AI_HISTORY
         pushHistory: (msg) => { _chatHistory.push(msg); },
