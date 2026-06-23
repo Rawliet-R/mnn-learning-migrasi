@@ -631,6 +631,77 @@
 .aic-admin-ok  { color: #48cfad; }
 .aic-admin-err { color: #ff9a9a; }
 
+/* ─────────────────────────────────────────────────────────
+   ADMIN ANALYTICS DASHBOARD
+───────────────────────────────────────────────────────── */
+.aic-analytics-card { border-color: rgba(99,179,237,0.3); }
+.aic-analytics-empty { font-size: 13px; color: rgba(255,255,255,0.4); text-align: center; padding: 16px 0; }
+.aic-analytics-subtitle {
+    font-size: 11px; font-weight: 600; letter-spacing: 1px;
+    color: rgba(255,255,255,0.4); margin: 16px 0 8px;
+    text-transform: uppercase;
+}
+
+/* Stat grid */
+.aic-stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.aic-stat-box {
+    background: rgba(255,255,255,0.05);
+    border-radius: 10px;
+    padding: 10px 12px;
+    border: 1px solid rgba(255,255,255,0.07);
+}
+.aic-stat-highlight {
+    background: rgba(99,179,237,0.1);
+    border-color: rgba(99,179,237,0.25);
+}
+.aic-stat-num {
+    font-size: 18px; font-weight: 700; color: #fff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.aic-stat-lbl { font-size: 10px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+
+/* Feature bar chart */
+.aic-feat-chart { display: flex; flex-direction: column; gap: 6px; }
+.aic-feat-row { display: flex; align-items: center; gap: 8px; }
+.aic-feat-label { font-size: 11px; color: rgba(255,255,255,0.6); width: 110px; flex-shrink: 0; }
+.aic-feat-bar-wrap { flex: 1; background: rgba(255,255,255,0.07); border-radius: 4px; height: 8px; overflow: hidden; }
+.aic-feat-bar { height: 100%; background: #63b3ed; border-radius: 4px; transition: width 0.4s ease; }
+.aic-feat-count { font-size: 11px; color: rgba(255,255,255,0.5); width: 30px; text-align: right; }
+
+/* Top users table */
+.aic-table-wrap { overflow-x: auto; margin-top: 4px; }
+.aic-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.aic-table th {
+    text-align: left; padding: 6px 8px;
+    color: rgba(255,255,255,0.4); border-bottom: 1px solid rgba(255,255,255,0.08);
+    font-weight: 600;
+}
+.aic-table td { padding: 6px 8px; color: rgba(255,255,255,0.75); border-bottom: 1px solid rgba(255,255,255,0.05); }
+.aic-uid-cell { font-family: monospace; font-size: 10px; }
+.aic-refresh-btn {
+    font-size: 10px; background: transparent; border: 1px solid rgba(99,179,237,0.4);
+    color: #63b3ed; border-radius: 6px; padding: 2px 8px; cursor: pointer; margin-left: 8px;
+}
+.aic-refresh-btn:hover { background: rgba(99,179,237,0.1); }
+
+/* Light mode overrides */
+[data-theme="light"] .aic-stat-box { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.08); }
+[data-theme="light"] .aic-stat-num { color: #1a1a2e; }
+[data-theme="light"] .aic-stat-lbl { color: rgba(0,0,0,0.45); }
+[data-theme="light"] .aic-feat-label { color: rgba(0,0,0,0.6); }
+[data-theme="light"] .aic-feat-bar-wrap { background: rgba(0,0,0,0.07); }
+[data-theme="light"] .aic-feat-bar { background: #3c3489; }
+[data-theme="light"] .aic-feat-count { color: rgba(0,0,0,0.5); }
+[data-theme="light"] .aic-table th { color: rgba(0,0,0,0.4); border-color: rgba(0,0,0,0.1); }
+[data-theme="light"] .aic-table td { color: rgba(0,0,0,0.75); border-color: rgba(0,0,0,0.05); }
+[data-theme="light"] .aic-analytics-empty { color: rgba(0,0,0,0.4); }
+[data-theme="light"] .aic-analytics-subtitle { color: rgba(0,0,0,0.35); }
+
 /* Loading spinner */
 .aic-loading-wrap {
     display: flex;

@@ -310,6 +310,8 @@ const AI_SENSEI = (() => {
             });
 
             console.log('[ADMIN] Credit ditambahkan:', amount, '-> memberId:', memberId, '| uid:', targetUid);
+            // Analytics: catat top-up
+            if (window.AI_ANALYTICS?.trackTopUp) AI_ANALYTICS.trackTopUp(targetUid, amount, 'admin_add');
             return { success: true, targetUid, email };
         } catch (e) {
             console.error('[ADMIN] adminAddCreditByMemberId error:', e.message);
@@ -558,19 +560,22 @@ const AI_SENSEI = (() => {
      * Catat log penggunaan ke collection aiUsageLogs.
      * Fire-and-forget — tidak block UI jika gagal.
      */
-    async function _logUsage(feature, creditUsed) {
-        const uid = window.AUTH?.user?.uid;
-        if (!uid || typeof _fbDb === 'undefined') return;
-        try {
-            await _fbDb.collection('aiUsageLogs').add({
-                uid,
-                feature,
-                creditUsed,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            });
-            console.log('[AI_CREDIT] Log usage:', feature, creditUsed, 'credit');
-        } catch (e) {
-            console.warn('[AI_CREDIT] _logUsage gagal (non-critical):', e.message);
+    /**
+     * Log usage + trigger analytics tracking.
+     * Delegate ke AI_ANALYTICS.track() — fire-and-forget.
+     * @param {string} feature        - nama fitur dari _detectFeature()
+     * @param {number} creditUsed     - kredit yang dipotong
+     * @param {number} messageLength  - panjang pesan user
+     * @param {number} answerLength   - panjang jawaban AI
+     * @param {boolean} success       - apakah sukses
+     * @param {number} currentBalance - saldo setelah deduct
+     */
+    function _logUsage(feature, creditUsed, messageLength, answerLength, success, currentBalance) {
+        // Delegate ke modul analytics — tidak perlu await, tidak block UI
+        if (window.AI_ANALYTICS?.track) {
+            window.AI_ANALYTICS.track(
+                feature, creditUsed, messageLength, answerLength, success, currentBalance
+            );
         }
     }
 
@@ -878,6 +883,8 @@ const AI_SENSEI = (() => {
             }
 
             invalidateCache();
+            // Analytics: catat perubahan credit oleh admin
+            if (window.AI_ANALYTICS?.trackTopUp) AI_ANALYTICS.trackTopUp(targetUid, amount, 'admin_set');
             return { success: true, targetUid, email, creditSebelum, creditSesudah: amount };
         } catch (e) {
             console.error('[ADMIN] adminSetCreditByMemberId error:', e.message);
@@ -1063,11 +1070,13 @@ const AI_SENSEI = (() => {
                 await AI_HISTORY.saveMessage('user', msg);
                 await AI_HISTORY.saveMessage('assistant', result.answer);
             }
-            // Log usage ke Firestore
-            await _logUsage(feature, cost);
+            // Log usage + analytics (feature, credits, msgLen, answerLen, success, balance)
+            _logUsage(feature, cost, msg.length, result.answer.length, true, result.remaining ?? 0);
             // Refresh kredit display
             refreshCreditDisplay();
         } else {
+            // Log kegagalan juga — analytics tetap dicatat, creditsUsed = 0 (tidak dipotong)
+            _logUsage(feature, 0, msg.length, 0, false, null);
             appendMessage('error', result.error);
         }
     }
@@ -1148,6 +1157,11 @@ const AI_SENSEI = (() => {
             return; // ← stop init, tidak pasang event listener apapun
         }
         // ──────────────────────────────────────────────────────────────────
+
+        // Update retention flags (fire-and-forget)
+        if (window.AI_ANALYTICS?.updateRetention) {
+            window.AI_ANALYTICS.updateRetention();
+        }
 
         // Cek & klaim welcome bonus (user baru) ATAU premium upgrade bonus (user lama yang upgrade)
         claimWelcomeBonus().then(result => {

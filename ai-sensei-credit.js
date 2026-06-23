@@ -46,12 +46,22 @@ const AI_CREDIT_PAGE = (() => {
             const isAdmin = window.AI_FLAG?.isAdmin?.() || false;
             const isPrem  = typeof isPremiumUser === 'function' && isPremiumUser();
 
+            // Ambil global stats untuk admin dashboard (skip jika bukan admin)
+            let globalStats = null;
+            let topUsers    = [];
+            if (isAdmin && window.AI_ANALYTICS) {
+                [globalStats, topUsers] = await Promise.all([
+                    withTimeout(AI_ANALYTICS.getGlobalStats(), 5000).catch(() => null),
+                    withTimeout(AI_ANALYTICS.getTopUsers(),    5000).catch(() => []),
+                ]);
+            }
+
             container.innerHTML =
                 _renderBalanceCard(credits, isPrem) +
                 _renderWelcomeBonus() +
                 _renderUsageHistory(logs) +
                 _renderTopUpPackages() +
-                (isAdmin ? _renderAdminTools() : '');
+                (isAdmin ? _renderAdminDashboard(globalStats, topUsers) + _renderAdminTools() : '');
 
             _bindEvents();
 
@@ -220,6 +230,120 @@ const AI_CREDIT_PAGE = (() => {
         '</div>';
     }
 
+    // ─────────────────────────────────────────────────────
+    // ADMIN DASHBOARD — statistik global AI Sensei
+    // ─────────────────────────────────────────────────────
+
+    function _renderAdminDashboard(stats, topUsers) {
+        if (!stats) {
+            return '<div class="aic-card aic-analytics-card">' +
+                '<div class="aic-section-title">📊 AI Sensei Analytics</div>' +
+                '<p class="aic-analytics-empty">Data belum tersedia. Mulai diisi setelah user pertama menggunakan AI.</p>' +
+            '</div>';
+        }
+
+        // Hitung top feature dari counter global
+        const featureCounters = [
+            { label: 'Pertanyaan Umum',    key: 'feature_general'   },
+            { label: 'Kotoba',             key: 'feature_kotoba'    },
+            { label: 'Bunpou',             key: 'feature_bunpou'    },
+            { label: 'Koreksi Kalimat',    key: 'feature_correction'},
+            { label: 'Roleplay',           key: 'feature_kaiwa'     },
+            { label: 'Interview AI',       key: 'feature_interview' },
+        ];
+        let topFeature = '-';
+        let topCount   = 0;
+        featureCounters.forEach(f => {
+            const v = stats[f.key] || 0;
+            if (v > topCount) { topFeature = f.label; topCount = v; }
+        });
+
+        const totalMessages    = stats.totalMessages          || 0;
+        const totalCredits     = stats.totalCreditsUsed       || 0;
+        const totalUsers       = stats.totalUniqueUsers       || '—';
+        const avgCredits       = totalUsers && totalUsers !== '—'
+            ? (totalCredits / totalUsers).toFixed(1) : '—';
+        const totalTopUp       = stats.totalTopUpCount        || 0;
+        const totalPurchased   = stats.totalCreditsPurchased  || 0;
+        const totalRevenue     = (stats.totalRevenueEstimate  || 0).toLocaleString('id-ID');
+        const zeroCredit       = stats.usersWithZeroCredit    || '—';
+
+        // Top users rows
+        const topUsersRows = (topUsers || []).map((u, i) =>
+            '<tr>' +
+                '<td>' + (i + 1) + '</td>' +
+                '<td class="aic-uid-cell">' + (u.uid || '').slice(0, 8) + '…</td>' +
+                '<td>' + (u.totalMessages || 0) + '</td>' +
+                '<td>' + (u.totalCreditsUsed || 0) + '</td>' +
+                '<td>' + (u.favoriteFeature || '-') + '</td>' +
+                '<td>' + (u.lastUsedDate || '-') + '</td>' +
+            '</tr>'
+        ).join('') || '<tr><td colspan="6" style="text-align:center;opacity:0.5">Belum ada data</td></tr>';
+
+        // Feature breakdown bar chart (sederhana)
+        const maxCount = Math.max(...featureCounters.map(f => stats[f.key] || 0), 1);
+        const featureBars = featureCounters.map(f => {
+            const v   = stats[f.key] || 0;
+            const pct = Math.round((v / maxCount) * 100);
+            return '<div class="aic-feat-row">' +
+                '<span class="aic-feat-label">' + f.label + '</span>' +
+                '<div class="aic-feat-bar-wrap">' +
+                    '<div class="aic-feat-bar" style="width:' + pct + '%"></div>' +
+                '</div>' +
+                '<span class="aic-feat-count">' + v + '</span>' +
+            '</div>';
+        }).join('');
+
+        return '<div class="aic-card aic-analytics-card">' +
+
+            '<div class="aic-section-title">📊 AI Sensei Analytics</div>' +
+
+            // Stat grid
+            '<div class="aic-stat-grid">' +
+                '<div class="aic-stat-box">' +
+                    '<div class="aic-stat-num">' + totalMessages + '</div>' +
+                    '<div class="aic-stat-lbl">Total Pesan</div>' +
+                '</div>' +
+                '<div class="aic-stat-box">' +
+                    '<div class="aic-stat-num">' + totalCredits + '</div>' +
+                    '<div class="aic-stat-lbl">Total Credit Dipakai</div>' +
+                '</div>' +
+                '<div class="aic-stat-box">' +
+                    '<div class="aic-stat-num">' + topFeature + '</div>' +
+                    '<div class="aic-stat-lbl">Fitur Terpopuler</div>' +
+                '</div>' +
+                '<div class="aic-stat-box">' +
+                    '<div class="aic-stat-num">' + avgCredits + '</div>' +
+                    '<div class="aic-stat-lbl">Rata-rata Credit / User</div>' +
+                '</div>' +
+                '<div class="aic-stat-box">' +
+                    '<div class="aic-stat-num">' + totalTopUp + '</div>' +
+                    '<div class="aic-stat-lbl">Total Top Up</div>' +
+                '</div>' +
+                '<div class="aic-stat-box aic-stat-highlight">' +
+                    '<div class="aic-stat-num">Rp ' + totalRevenue + '</div>' +
+                    '<div class="aic-stat-lbl">Est. Revenue</div>' +
+                '</div>' +
+            '</div>' +
+
+            // Feature breakdown
+            '<div class="aic-analytics-subtitle">Penggunaan per Fitur</div>' +
+            '<div class="aic-feat-chart">' + featureBars + '</div>' +
+
+            // Top 10 users
+            '<div class="aic-analytics-subtitle">Top 10 User Aktif ' +
+                '<button id="aic-refresh-topusers" class="aic-refresh-btn">↻ Refresh</button>' +
+            '</div>' +
+            '<div class="aic-table-wrap"><table class="aic-table">' +
+                '<thead><tr>' +
+                    '<th>#</th><th>UID</th><th>Pesan</th><th>Credit</th><th>Favorit</th><th>Terakhir</th>' +
+                '</tr></thead>' +
+                '<tbody>' + topUsersRows + '</tbody>' +
+            '</table></div>' +
+
+        '</div>';
+    }
+
     function _renderAdminTools() {
         return '<div class="aic-card aic-admin-card">' +
             '<div class="aic-section-title">Admin Tools</div>' +
@@ -241,6 +365,22 @@ const AI_CREDIT_PAGE = (() => {
     // ─────────────────────────────────────────────────────
 
     function _bindEvents() {
+        // Admin: refresh top users snapshot
+        const refreshTopBtn = document.getElementById('aic-refresh-topusers');
+        if (refreshTopBtn && window.AI_ANALYTICS) {
+            refreshTopBtn.addEventListener('click', async () => {
+                refreshTopBtn.disabled = true;
+                refreshTopBtn.textContent = '...';
+                // Ambil semua UID dari Firestore users collection
+                // (Pendekatan sederhana: ambil dari topUsers yang sudah ada + trigger refresh)
+                const existing = await AI_ANALYTICS.getTopUsers();
+                const uids     = existing.map(u => u.uid).filter(Boolean);
+                await AI_ANALYTICS.refreshTopUsersSnapshot(uids);
+                refreshTopBtn.textContent = '✓ Updated';
+                setTimeout(() => { refreshTopBtn.disabled = false; refreshTopBtn.textContent = '↻ Refresh'; }, 2000);
+            });
+        }
+
         // Admin: toggle mode Tambah / Set
         let _adminMode = 'tambah';
         const btnTambah  = document.getElementById('aic-mode-tambah');
