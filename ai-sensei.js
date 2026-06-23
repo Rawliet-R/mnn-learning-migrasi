@@ -119,8 +119,9 @@ const AI_SENSEI = (() => {
         }
 
         // Tentukan nilai default berdasarkan isPremium
-        const defaultCredits = isPrem ? 50 : 5;
-        const defaultPlan    = isPrem ? 'premium-bonus' : 'free';
+        // Credit awal = 0 — semua credit awal diberikan oleh claimWelcomeBonus (1x per akun)
+        const defaultCredits = 0;
+        const defaultPlan    = isPrem ? 'premium' : 'free';
 
         const patch = {
             aiCredits:    data.aiCredits    ?? defaultCredits,
@@ -170,35 +171,32 @@ const AI_SENSEI = (() => {
 
             let { aiCredits, aiPlan, aiUsage, aiCreditReset } = aiFields;
 
-            // Reset bulanan jika bulan berubah
-            if (aiCreditReset !== now) {
-                const resetCredits = isPrem ? PREMIUM_CREDITS_MONTHLY : FREE_CREDITS_MONTHLY;
-                const resetPlan    = isPrem ? 'premium' : 'free';
-                console.log('[AI_CREDIT] 🔄 Reset bulanan — bulan lama:', aiCreditReset,
-                            '→ bulan baru:', now, '| kredit baru:', resetCredits);
-                await ref.set({
-                    aiCredits:    resetCredits,
-                    aiUsage:      0,
-                    aiPlan:       resetPlan,
-                    aiCreditReset: now,
-                }, { merge: true });
-                aiCredits    = resetCredits;
-                aiUsage      = 0;
-                aiPlan       = resetPlan;
-                aiCreditReset = now;
-            }
+            // [DISABLED] Reset bulanan dimatikan sementara
+            // Aktifkan kembali jika sistem kredit bulanan siap
+            // if (aiCreditReset !== now) {
+            //     const resetCredits = isPrem ? PREMIUM_CREDITS_MONTHLY : FREE_CREDITS_MONTHLY;
+            //     const resetPlan    = isPrem ? 'premium' : 'free';
+            //     console.log('[AI_CREDIT] 🔄 Reset bulanan — bulan lama:', aiCreditReset,
+            //                 '→ bulan baru:', now, '| kredit baru:', resetCredits);
+            //     await ref.set({
+            //         aiCredits:    resetCredits,
+            //         aiUsage:      0,
+            //         aiPlan:       resetPlan,
+            //         aiCreditReset: now,
+            //     }, { merge: true });
+            //     aiCredits    = resetCredits;
+            //     aiUsage      = 0;
+            //     aiPlan       = resetPlan;
+            //     aiCreditReset = now;
+            // }
 
-            // Sinkronisasi plan jika premium status berubah
-            // (misal: user baru upgrade premium)
+            // Sinkronisasi plan jika premium status berubah (label saja, tidak tambah kredit)
+            // [DISABLED] Auto-credit saat upgrade dimatikan — kredit dikelola manual/admin
             const expectedPlan = isPrem ? 'premium' : 'free';
-            if (aiPlan === 'free' && isPrem) {
-                console.log('[AI_CREDIT] ⬆️ User upgrade ke premium — update plan & kredit');
-                await ref.set({
-                    aiCredits: PREMIUM_CREDITS_MONTHLY,
-                    aiPlan: 'premium',
-                }, { merge: true });
-                aiCredits = PREMIUM_CREDITS_MONTHLY;
-                aiPlan    = 'premium';
+            if (aiPlan !== expectedPlan) {
+                console.log('[AI_CREDIT] 🔄 Sinkronisasi aiPlan:', aiPlan, '→', expectedPlan);
+                await ref.set({ aiPlan: expectedPlan }, { merge: true });
+                aiPlan = expectedPlan;
             }
 
             // [FIX PC-1] Model kredit yang benar:
@@ -600,7 +598,7 @@ const AI_SENSEI = (() => {
             }
 
             const isPrem = typeof isPremiumUser === 'function' && isPremiumUser();
-            const bonus  = isPrem ? 15 : 5;
+            const bonus  = isPrem ? 20 : 5;
             const plan   = isPrem ? 'premium' : 'free';
 
             console.log('[AI_CREDIT] Mengklaim welcome bonus:', bonus, 'credit | isPremium:', isPrem);
