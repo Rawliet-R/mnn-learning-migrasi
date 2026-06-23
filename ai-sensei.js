@@ -364,7 +364,8 @@ const AI_SENSEI = (() => {
 'level, catatan kesalahan umum pemula, dan penggunaan di lingkungan kerja Jepang jika relevan.\n\n' +
 'KOREKSI KALIMAT\n' +
 'Jika pengguna membuat kesalahan: tampilkan versi yang benar, jelaskan bagian yang salah,\n' +
-'berikan tips agar tidak mengulang kesalahan. Jangan hanya mengatakan "salah".\n\n' +
+'berikan tips agar tidak mengulang kesalahan. Jangan hanya mengatakan "salah".\n' +
+'PENTING: Hiragana dan kanji untuk kata yang sama KEDUANYA benar. "もうします" dan "申します" adalah SAMA-SAMA BENAR, bukan kesalahan. Hanya koreksi jika ada kesalahan tata bahasa, kosakata yang salah, atau partikel yang tidak tepat. Jika user menulis hiragana semua dan tata bahasanya benar: puji dan lanjutkan, JANGAN koreksi.\n\n' +
 'LATIHAN\n' +
 'Jika pengguna meminta latihan: sesuaikan level, berikan soal bertahap, tunggu jawaban, koreksi dan jelaskan.\n\n' +
 'SIMULASI PERCAKAPAN\n' +
