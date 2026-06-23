@@ -500,7 +500,7 @@ function getCurrentLesson() { return getLesson(STATE.activeBook, STATE.currentLe
 // bukan dari lesson yang sedang aktif di tab Materi.
 function getLessonForVocab(v) {
     if (!v) return null;
-    if (!v._book || v._book === 'master') return null; // master kotoba tidak terikat lesson/bunpou
+    if (!v._book || v._book === 'master' || v._book === 'book3') return null; // book3/master tidak terikat bunpou
     const lessons = DB[v._book] || [];
     return lessons.find(l => l.id === v._lesson) || null;
 }
@@ -4710,7 +4710,7 @@ function renderProfilePanel(panel) {
             </button>
             <button class="profile-action-item" onclick="closeProfileSheet();navigateTo('kotoba')">
               <span class="profile-action-icon">📚</span>
-              <div><div class="profile-action-label">Ensiklopedia Kosakata</div><div class="profile-action-sub">Semua kata dari Buku I & II</div></div>
+              <div><div class="profile-action-label">Ensiklopedia Kosakata</div><div class="profile-action-sub">Semua kata dari Buku I, II & III</div></div>
             </button>
             <button class="profile-action-item danger" onclick="if(confirm('Yakin keluar?')){AUTH.logout();closeProfileSheet();}">
               <span class="profile-action-icon">🚪</span>
@@ -5146,7 +5146,7 @@ function getKotobaAllVocab() {
     const results = [];
 
     // 1. From lesson DB
-    ['book1','book2'].forEach(bookKey => {
+    ['book1','book2','book3'].forEach(bookKey => {
         if (!DB[bookKey]) return;
         DB[bookKey].forEach(lesson => {
             (lesson.vocab || []).forEach(v => {
@@ -5697,7 +5697,7 @@ function renderKotobaPage() {
         // Book filter
         if (KOTOBA_STATE.book === 'book1')  vocab = vocab.filter(v => v._book === 'book1');
         else if (KOTOBA_STATE.book === 'book2')  vocab = vocab.filter(v => v._book === 'book2');
-        else if (KOTOBA_STATE.book === 'master') vocab = vocab.filter(v => v._src === 'master');
+        else if (KOTOBA_STATE.book === 'book3') vocab = vocab.filter(v => v._book === 'book3');
         // 'all' includes everything
     }
 
@@ -5750,9 +5750,10 @@ function renderKotobaPage() {
     }
     if (subEl) {
         if (isFullAccess) {
-            const dbC  = vocab.filter(v=>v._src==='db').length;
-            const mkC  = vocab.filter(v=>v._src==='master').length;
-            subEl.textContent = `Pelajaran: ${dbC} kata  ·  Master DB: ${mkC} kata`;
+            const b1C = vocab.filter(v=>v._book==='book1').length;
+            const b2C = vocab.filter(v=>v._book==='book2').length;
+            const b3C = vocab.filter(v=>v._book==='book3').length;
+            subEl.textContent = `Buku I: ${b1C}  ·  Buku II: ${b2C}  ·  Buku III: ${b3C} kata`;
         } else {
             subEl.textContent = 'Bab 1–3 Gratis · 👑 Upgrade untuk semua kata';
         }
@@ -5771,8 +5772,8 @@ function renderKotobaPage() {
     sliced.forEach(v => {
         if (isLessonSort) {
             let group;
-            if (v._src === 'master') {
-                group = '📖 Master Kosakata';
+            if (v._book === 'book3') {
+                group = 'Buku III — ' + (v._lessonTitle || '');
             } else {
                 group = (v._book === 'book1' ? 'Buku I' : 'Buku II') + ' — ' + (v._lessonTitle || '');
             }

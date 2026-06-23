@@ -1,0 +1,167 @@
+[
+  {
+    "id": "EX_V10_01",
+    "package": "V10",
+    "section": "expression",
+    "question_type": "fill",
+    "question": "毎日、ダイエット中ですから、ごはんを（　）ようにしています。",
+    "choices": ["食べられる", "食べすぎない", "食べる"],
+    "answer": 1,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "EX_V10_02",
+    "package": "V10",
+    "section": "expression",
+    "question_type": "dialogue",
+    "question": "アニタ：このあと、（　）？\nヒル二：お腹がすきましたね。何かたべませんか？\nアニタ：じゃあ、フードコートに行きましょう。",
+    "choices": ["どうしますか", "どうしたんですか", "どうおもうのか", "どうしてですか"],
+    "answer": 0,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "EX_V10_03",
+    "package": "V10",
+    "section": "expression",
+    "question_type": "dialogue",
+    "question": "A：「パームキッチン」っていうアジアレストラン、行ったことありますか？\nB：いいえ、ありません。\nA：すごくおいしいですよ。今度、いっしょに食べに行きませんか？\nB：（　）。ぜひ、行きましょう。",
+    "choices": ["いいですね", "ちょっと", "まだまだです", "わるかったですね"],
+    "answer": 0,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "EX_V10_04",
+    "package": "V10",
+    "section": "expression",
+    "question_type": "dialogue",
+    "question": "A：プロレス、（　）。\nB：はじめてでしたけど、とてもおもしろかったです。",
+    "choices": ["いつですか", "わかりましたか", "どうでしたか", "どうおもいますか"],
+    "answer": 2,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "EX_V10_05",
+    "package": "V10",
+    "section": "expression",
+    "question_type": "dialogue",
+    "question": "A：（　）べんきょうしましたか。\nB：1年ぐらいです。",
+    "choices": ["どれぐらい", "いつぐらい", "どうして", "なにを"],
+    "answer": 0,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "EX_V10_06",
+    "package": "V10",
+    "section": "expression",
+    "question_type": "dialogue",
+    "question": "A：すみません。\nB：はい。\nA：それ、新しい教科書ですか。\nB：そうですよ。\nA：（　）、見せてもらえませんか。\nB：どうぞ。",
+    "choices": ["ちょっと", "いいですか", "おかげで", "ときどき"],
+    "answer": 0,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "EX_V10_07",
+    "package": "V10",
+    "section": "expression",
+    "question_type": "dialogue",
+    "question": "A：コップやおさらは、（　）。\nB：それは、バーベキュー場にありますから、だいじょうぶです。",
+    "choices": ["どうしたんですか", "どうしますか", "どうしましたか", "どうなさいましたか"],
+    "answer": 1,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "EX_V10_08",
+    "package": "V10",
+    "section": "expression",
+    "question_type": "dialogue",
+    "question": "A：デザートはどうですか。\nB：（　）じゃあ、バナナを持って行きます。焼いて食べましょう。",
+    "choices": ["そうですね", "それから", "そうですか", "そこまで"],
+    "answer": 0,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "EX_V10_09",
+    "package": "V10",
+    "section": "expression",
+    "question_type": "dialogue",
+    "question": "A：わー、それ、辛そうな料理ですね。\nB：（　）私の国のカレーです。あまり辛くないですよ。\nA：そうなんですか。",
+    "choices": ["ちょっと", "これですか", "それですか", "いいですか"],
+    "answer": 1,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "EX_V10_10",
+    "package": "V10",
+    "section": "expression",
+    "question_type": "dialogue",
+    "question": "A：あのう、トイレットペーパーがなくなったんですが……。\nB：あ、そう？じゃ、倉庫にある（　）、取って来てくれる？",
+    "choices": ["から", "と", "のに", "けど"],
+    "answer": 0,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "EX_V10_11",
+    "package": "V10",
+    "section": "expression",
+    "question_type": "dialogue",
+    "question": "A：テーブルは、（　）並べますか。\nB：まるいテーブルを9個出して、3つずつ3れつに並べてください。\nA：よこに3つ並べて3れつですね。\nB：そうです。",
+    "choices": ["どこに", "どこで", "いつ", "どうやって"],
+    "answer": 3,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "EX_V10_12",
+    "package": "V10",
+    "section": "expression",
+    "question_type": "dialogue",
+    "question": "A：（　）。\nB：1週間ぐらい前から、目がかゆくて、鼻水も出るんです。",
+    "choices": ["どうされましたか", "どうしますか", "どうするのか", "どうしたらいいですか"],
+    "answer": 0,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "EX_V10_13",
+    "package": "V10",
+    "section": "expression",
+    "question_type": "dialogue",
+    "question": "A：どうしたんですか。\nB：最近よく眠れなくて、体がだるいんです。\nA：（　）。よく眠れない時は、ぬるいお風呂にゆっくり入るといいですよ。\nB：そうですか。ためしてみます。",
+    "choices": ["おかげさまで", "それはかまいませんよ", "それはいけませんね", "おしあわせに"],
+    "answer": 2,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "EX_V10_14",
+    "package": "V10",
+    "section": "expression",
+    "question_type": "dialogue",
+    "question": "A：健康のために、何か気をつけていますか。\nB：はい、（　）運動するようにしています。ジムに行ったり、ウォーキングしたりしています。",
+    "choices": ["できるだけ", "それから", "そのまえに"],
+    "answer": 0,
+    "audio_id": null,
+    "status": "active"
+  },
+  {
+    "id": "EX_V10_15",
+    "package": "V10",
+    "section": "expression",
+    "question_type": "dialogue",
+    "question": "A：そのピアス、すてきですね。\nB：あ、これは、兄が（　）お守りです。",
+    "choices": ["もらった", "いただいた", "くれた", "あげた"],
+    "answer": 2,
+    "audio_id": null,
+    "status": "active"
+  }
+]
