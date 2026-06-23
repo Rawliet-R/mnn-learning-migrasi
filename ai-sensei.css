@@ -572,6 +572,28 @@
 
 /* Admin tools */
 .aic-admin-card { border-color: rgba(255,193,7,0.2); }
+.aic-admin-mode-toggle {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+.aic-mode-btn {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,193,7,0.3);
+    background: transparent;
+    color: rgba(255,193,7,0.5);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.aic-mode-btn.aic-mode-active {
+    background: rgba(255,193,7,0.15);
+    border-color: rgba(255,193,7,0.6);
+    color: #ffc107;
+}
 .aic-admin-label {
     font-size: 13px;
     color: var(--text-muted, #888);

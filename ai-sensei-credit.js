@@ -223,9 +223,14 @@ const AI_CREDIT_PAGE = (() => {
     function _renderAdminTools() {
         return '<div class="aic-card aic-admin-card">' +
             '<div class="aic-section-title">Admin Tools</div>' +
-            '<div class="aic-admin-label">Tambah Credit via MNN-ID</div>' +
+            '<div class="aic-admin-mode-toggle">' +
+                '<button id="aic-mode-tambah" class="aic-mode-btn aic-mode-active">+ Tambah Credit</button>' +
+                '<button id="aic-mode-set" class="aic-mode-btn">= Set Credit</button>' +
+            '</div>' +
+            '<div class="aic-admin-label" id="aic-admin-label">Tambah Credit via MNN-ID</div>' +
             '<input id="aic-admin-uid" class="aic-admin-input" placeholder="Contoh: MNN-849622" autocomplete="off" spellcheck="false" style="text-transform:uppercase">' +
-            '<input id="aic-admin-amount" class="aic-admin-input" type="number" placeholder="Jumlah Credit" min="1">' +
+            '<input id="aic-admin-amount" class="aic-admin-input" type="number" placeholder="Jumlah Credit" min="0">' +
+            '<div id="aic-set-warning" style="display:none;font-size:12px;color:#BA7517;margin-bottom:6px;">&#9888; Set akan mengganti credit ke nilai ini, bukan menambah.</div>' +
             '<button id="aic-admin-submit" class="aic-admin-btn">Tambah Credit</button>' +
             '<div id="aic-admin-result" class="aic-admin-result"></div>' +
         '</div>';
@@ -236,16 +241,38 @@ const AI_CREDIT_PAGE = (() => {
     // ─────────────────────────────────────────────────────
 
     function _bindEvents() {
-        // Admin: submit tambah credit
-        const adminBtn = document.getElementById('aic-admin-submit');
+        // Admin: toggle mode Tambah / Set
+        let _adminMode = 'tambah';
+        const btnTambah  = document.getElementById('aic-mode-tambah');
+        const btnSet     = document.getElementById('aic-mode-set');
+        const adminLabel = document.getElementById('aic-admin-label');
+        const setWarning = document.getElementById('aic-set-warning');
+        const adminBtn   = document.getElementById('aic-admin-submit');
+
+        function _switchMode(mode) {
+            _adminMode = mode;
+            const isTambah = mode === 'tambah';
+            btnTambah.className  = 'aic-mode-btn' + (isTambah ? ' aic-mode-active' : '');
+            btnSet.className     = 'aic-mode-btn' + (!isTambah ? ' aic-mode-active' : '');
+            adminLabel.textContent = isTambah ? 'Tambah Credit via MNN-ID' : 'Set Credit via MNN-ID';
+            adminBtn.textContent   = isTambah ? 'Tambah Credit' : 'Set Credit';
+            setWarning.style.display = isTambah ? 'none' : 'block';
+            document.getElementById('aic-admin-result').textContent = '';
+        }
+
+        if (btnTambah) btnTambah.addEventListener('click', () => _switchMode('tambah'));
+        if (btnSet)    btnSet.addEventListener('click',    () => _switchMode('set'));
+
+        // Admin: submit
         if (adminBtn) {
             adminBtn.addEventListener('click', async () => {
                 const uid    = document.getElementById('aic-admin-uid')?.value?.trim();
                 const amount = parseInt(document.getElementById('aic-admin-amount')?.value);
                 const result = document.getElementById('aic-admin-result');
+                const minVal = _adminMode === 'set' ? 0 : 1;
 
-                if (!uid || !amount || amount < 1) {
-                    if (result) result.textContent = 'Isi UID dan jumlah credit dengan benar.';
+                if (!uid || isNaN(amount) || amount < minVal) {
+                    if (result) result.textContent = 'Isi MNN-ID dan jumlah credit dengan benar.';
                     return;
                 }
 
@@ -253,19 +280,32 @@ const AI_CREDIT_PAGE = (() => {
                 adminBtn.textContent = 'Memproses...';
                 if (result) result.textContent = '';
 
-                // Cek apakah input berupa MNN-ID atau UID mentah
-            const isMemberId = /^MNN-/i.test(uid);
-            const res = isMemberId
-                ? await AI_SENSEI.adminAddCreditByMemberId(uid, amount)
-                : await AI_SENSEI.adminAddCredit(uid, amount);
+                const isMemberId = /^MNN-/i.test(uid);
+                let res;
+                if (_adminMode === 'tambah') {
+                    res = isMemberId
+                        ? await AI_SENSEI.adminAddCreditByMemberId(uid, amount)
+                        : await AI_SENSEI.adminAddCredit(uid, amount);
+                } else {
+                    res = isMemberId
+                        ? await AI_SENSEI.adminSetCreditByMemberId(uid, amount)
+                        : await AI_SENSEI.adminSetCredit(uid, amount);
+                }
 
                 adminBtn.disabled = false;
-                adminBtn.textContent = 'Tambah Credit';
+                adminBtn.textContent = _adminMode === 'tambah' ? 'Tambah Credit' : 'Set Credit';
 
                 if (result) {
-                    result.textContent = res.success
-                        ? 'Berhasil! ' + amount + ' credit ditambahkan ke ' + uid + (res.email ? ' (' + res.email + ')' : '')
-                        : 'Gagal: ' + res.error;
+                    if (res.success) {
+                        const action = _adminMode === 'tambah' ? 'ditambahkan ke' : 'di-set ke';
+                        const detail = _adminMode === 'set'
+                            ? ' (sebelum: ' + res.creditSebelum + ' → sesudah: ' + res.creditSesudah + ')'
+                            : '';
+                        result.textContent = 'Berhasil! ' + amount + ' credit ' + action + ' ' + uid +
+                            (res.email ? ' (' + res.email + ')' : '') + detail;
+                    } else {
+                        result.textContent = 'Gagal: ' + res.error;
+                    }
                     result.className = 'aic-admin-result ' + (res.success ? 'aic-admin-ok' : 'aic-admin-err');
                 }
             });
