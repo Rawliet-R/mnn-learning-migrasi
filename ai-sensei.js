@@ -632,6 +632,62 @@ const AI_SENSEI = (() => {
     }
 
     // ─────────────────────────────────────────────────────
+    // PREMIUM UPGRADE BONUS — diberikan 1x saat user upgrade ke premium
+    // Terpisah dari welcome bonus agar user yang sudah klaim free bonus
+    // tetap bisa dapat premium bonus saat upgrade
+    // ─────────────────────────────────────────────────────
+    async function claimPremiumUpgradeBonus() {
+        const ref = _userRef();
+        if (!ref) return { claimed: false, amount: 0 };
+
+        const isPrem = typeof isPremiumUser === 'function' && isPremiumUser();
+        if (!isPrem) return { claimed: false, amount: 0 };
+
+        try {
+            const snap = await ref.get();
+            const data = snap.exists ? snap.data() : {};
+
+            // Sudah pernah klaim bonus premium → skip
+            if (data.aiPremiumBonusClaimed === true) {
+                console.log('[AI_CREDIT] Premium upgrade bonus sudah diklaim sebelumnya, skip.');
+                return { claimed: false, amount: 0 };
+            }
+
+            // Hanya berikan jika sebelumnya adalah user free (bukan akun baru langsung premium)
+            // Akun baru langsung premium sudah dapat 20 dari claimWelcomeBonus
+            if (data.aiWelcomeBonusClaimed !== true) {
+                console.log('[AI_CREDIT] Welcome bonus belum diklaim, premium bonus ditangani oleh claimWelcomeBonus.');
+                return { claimed: false, amount: 0 };
+            }
+
+            const bonus = 15; // Selisih premium(20) - free(5) = 15 tambahan
+            console.log('[AI_CREDIT] Mengklaim premium upgrade bonus:', bonus, 'credit');
+
+            await ref.set({
+                aiCredits:             firebase.firestore.FieldValue.increment(bonus),
+                aiPremiumBonusClaimed: true,
+                aiPlan:                'premium',
+            }, { merge: true });
+
+            await _fbDb.collection('creditTransactions').add({
+                uid:       window.AUTH.user.uid,
+                amount:    bonus,
+                type:      'premium_upgrade_bonus',
+                adminUid:  null,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+
+            invalidateCache();
+            console.log('[AI_CREDIT] Premium upgrade bonus berhasil diklaim:', bonus, 'credit');
+            return { claimed: true, amount: bonus };
+
+        } catch (e) {
+            console.error('[AI_CREDIT] claimPremiumUpgradeBonus error:', e.message);
+            return { claimed: false, amount: 0 };
+        }
+    }
+
+    // ─────────────────────────────────────────────────────
     // POPUP — credit tidak cukup
     // ─────────────────────────────────────────────────────
 
@@ -947,12 +1003,55 @@ const AI_SENSEI = (() => {
     function init() {
         invalidateCache();
 
-        // Cek & klaim welcome bonus saat pertama kali buka AI Sensei
+        // ── GUEST WALL — blokir akses sebelum apapun ──────────────────────
+        const isGuest = !window.AUTH?.user || window.AUTH?.user?.isGuest;
+        if (isGuest) {
+            // Nonaktifkan input & tombol kirim
+            const inp    = document.getElementById('ais-input');
+            const btn    = document.getElementById('ais-send-btn');
+            if (inp) {
+                inp.disabled    = true;
+                inp.placeholder = 'Login untuk menggunakan AI Sensei';
+            }
+            if (btn) btn.disabled = true;
+
+            // Tampilkan pesan login di area chat
+            const container = document.getElementById('ais-messages');
+            if (container) {
+                container.innerHTML = '';
+                const wall = document.createElement('div');
+                wall.className = 'ais-guest-wall';
+                wall.innerHTML =
+                    '<div class="ais-guest-wall-icon">🔒</div>' +
+                    '<p class="ais-guest-wall-title">Login Diperlukan</p>' +
+                    '<p class="ais-guest-wall-desc">Kamu perlu login untuk menggunakan AI Sensei.<br>Daftar gratis dan dapatkan 5 credit!</p>' +
+                    '<button class="ais-guest-wall-btn" onclick="window.AUTH?.openLogin?.()">Masuk / Daftar</button>';
+                container.appendChild(wall);
+            }
+
+            // Update credit display
+            const el = document.getElementById('ais-credit-display');
+            if (el) el.textContent = 'Login untuk akses';
+
+            console.log('[AI_CREDIT] Guest wall aktif — UI dinonaktifkan.');
+            return; // ← stop init, tidak pasang event listener apapun
+        }
+        // ──────────────────────────────────────────────────────────────────
+
+        // Cek & klaim welcome bonus (user baru) ATAU premium upgrade bonus (user lama yang upgrade)
         claimWelcomeBonus().then(result => {
             if (result.claimed) {
                 _showBonusToast(result.amount);
+                refreshCreditDisplay();
+            } else {
+                // Welcome bonus sudah diklaim → cek apakah ada premium upgrade bonus
+                claimPremiumUpgradeBonus().then(upgradeResult => {
+                    if (upgradeResult.claimed) {
+                        _showBonusToast(upgradeResult.amount);
+                    }
+                    refreshCreditDisplay();
+                });
             }
-            refreshCreditDisplay();
         });
 
         // Abort listener lama sebelum attach yang baru — cegah duplikat
@@ -1093,6 +1192,7 @@ const AI_SENSEI = (() => {
         appendMessage,
         handleSend,
         claimWelcomeBonus,
+        claimPremiumUpgradeBonus,
         adminAddCredit,
         adminAddCreditByMemberId,
         detectFeature: _detectFeature,
