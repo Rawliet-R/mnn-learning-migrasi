@@ -5722,8 +5722,8 @@ function renderKotobaPage() {
         else {
             // lesson sort: DB first (book1→book2 by lesson), then master
             vocab.sort((a,b) => {
-                if (a._src === 'db' && b._src === 'master') return -1;
-                if (a._src === 'master' && b._src === 'db')  return  1;
+                if (a._book === 'book3' && b._book !== 'book3') return 1;
+                if (a._book !== 'book3' && b._book === 'book3') return -1;
                 if (a._src === 'db' && b._src === 'db')
                     return a._book.localeCompare(b._book) || (a._lesson - b._lesson);
                 return 0;
@@ -5750,10 +5750,8 @@ function renderKotobaPage() {
     }
     if (subEl) {
         if (isFullAccess) {
-            const b1C = vocab.filter(v=>v._book==='book1').length;
-            const b2C = vocab.filter(v=>v._book==='book2').length;
-            const b3C = vocab.filter(v=>v._book==='book3').length;
-            subEl.textContent = `Buku I: ${b1C}  ·  Buku II: ${b2C}  ·  Buku III: ${b3C} kata`;
+            const totalKotoba = vocab.length;
+            subEl.textContent = `${totalKotoba.toLocaleString()} kosakata tersedia`;
         } else {
             subEl.textContent = 'Bab 1–3 Gratis · 👑 Upgrade untuk semua kata';
         }
@@ -6031,7 +6029,8 @@ function kotobaFlashToggleFav() {
 function kotobaFlashTTS() {
     const v = KOTOBA_STATE.flashPool[KOTOBA_STATE.flashIdx];
     if (!v) return;
-    const text = v.kanji || v.jp || v.kana || '';
+    // [FIX TTS] Selalu gunakan kana supaya bacaan benar (kanji bisa multi-reading)
+    const text = v.kana || v.kanji || v.jp || '';
     if (!text || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(text);
@@ -7595,7 +7594,8 @@ function init() {
         const lesson = getCurrentLesson();
         if (!lesson || !lesson.vocab.length) return;
         const w = lesson.vocab[Math.min(STATE.currentCard, lesson.vocab.length - 1)];
-        const text = w.kanji || w.kana || '';
+        // [FIX TTS] Selalu gunakan kana supaya bacaan benar
+        const text = w.kana || w.kanji || '';
         if (!text || !window.speechSynthesis) return;
         window.speechSynthesis.cancel();
         const utt = new SpeechSynthesisUtterance(text);
