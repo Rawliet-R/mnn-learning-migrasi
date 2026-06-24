@@ -483,3 +483,126 @@
   margin-left: 6px;
   vertical-align: middle;
 }
+
+/* ══════════════════════════════════════════════════════
+   CHOUKAI — Audio Player & Dialog UI
+   ══════════════════════════════════════════════════════ */
+
+.aijs-choukai-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.aijs-choukai-question-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 14px 16px;
+  line-height: 1.6;
+}
+
+/* Spinner / playing state */
+.aijs-choukai-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px;
+}
+
+.aijs-choukai-status {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* Sound wave animation */
+.aijs-tts-wave {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 28px;
+}
+.aijs-tts-wave span {
+  display: block;
+  width: 4px;
+  border-radius: 2px;
+  background: #6c63ff;
+  animation: aijs-wave-bounce 0.9s ease-in-out infinite;
+}
+.aijs-tts-wave span:nth-child(1) { height: 10px; animation-delay: 0.0s; }
+.aijs-tts-wave span:nth-child(2) { height: 20px; animation-delay: 0.1s; }
+.aijs-tts-wave span:nth-child(3) { height: 28px; animation-delay: 0.2s; }
+.aijs-tts-wave span:nth-child(4) { height: 18px; animation-delay: 0.3s; }
+.aijs-tts-wave span:nth-child(5) { height: 10px; animation-delay: 0.4s; }
+@keyframes aijs-wave-bounce {
+  0%,100% { transform: scaleY(0.5); opacity: .5; }
+  50%      { transform: scaleY(1);   opacity: 1;  }
+}
+
+/* Script / dialog box */
+.aijs-script-box {
+  background: var(--bg-card-hover);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.aijs-script-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.aijs-script-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.aijs-script-text {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-primary);
+}
+.aijs-script-male  .aijs-script-text { color: #7eb8ff; }
+.aijs-script-female .aijs-script-text { color: #f7a8c4; }
+
+/* Replay button */
+.aijs-replay-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 7px 16px;
+  border-radius: 9px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-card-hover);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.aijs-replay-btn:hover:not(:disabled) {
+  background: #6c63ff22;
+  color: #a89cff;
+  border-color: #6c63ff55;
+}
+.aijs-replay-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* TTS warning banner */
+.aijs-tts-warn {
+  background: #ff6b6b12;
+  border: 1px solid #ff6b6b44;
+  border-radius: 10px;
+  color: #ff9f9f;
+  font-size: 12px;
+  padding: 10px 14px;
+  line-height: 1.5;
+}
