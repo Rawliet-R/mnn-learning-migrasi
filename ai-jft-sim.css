@@ -127,7 +127,7 @@
 }
 
 .aijs-level-grid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;
 }
 .aijs-level-btn {
   padding: 13px 10px;
