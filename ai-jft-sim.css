@@ -606,3 +606,22 @@
   padding: 10px 14px;
   line-height: 1.5;
 }
+
+/* ══════════════════════════════════════════════════════
+   V2 — Dokkai docType badge
+   ══════════════════════════════════════════════════════ */
+
+.aijs-doc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-card-hover);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  letter-spacing: 0.3px;
+}

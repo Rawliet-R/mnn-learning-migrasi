@@ -123,42 +123,41 @@ const AI_JFT_SIM = (() => {
         };
     }
 
-    // ── Phase 2: IMAGE FRAMEWORK ──────────────────────────────────
-    // Kategori gambar yang didukung dan path asset-nya.
-    // Saat folder asset tersedia, sistem langsung bisa pakai tanpa refactor.
-    const IMAGE_CATEGORIES = ['brochure','schedule','menu','notice','map','workplace','sign','story'];
-    const IMAGE_ASSET_BASE = '/assets/jft/';
+    // ── IMAGE FRAMEWORK ───────────────────────────────────────────
+    // AI memilih imageId (mis. "restaurant_menu_01"), sistem load dari
+    // /assets/jft-images/{imageId}.jpg|.png. Tanpa refactor saat asset tersedia.
+    const IMAGE_ASSET_BASE = '/assets/jft-images/';
+    const IMAGE_EXTENSIONS = ['.jpg', '.png', '.webp'];
 
-    function _resolveImageAsset(category, assetName) {
-        if (!category || !assetName) return null;
-        return IMAGE_ASSET_BASE + category + '/' + assetName;
+    function _resolveImageAsset(imageId) {
+        if (!imageId) return null;
+        // Gunakan ekstensi pertama — saat ini placeholder; override saat asset ada
+        return IMAGE_ASSET_BASE + imageId + '.jpg';
     }
 
-    function _renderImagePlaceholder(category) {
-        const label = category ? category.charAt(0).toUpperCase() + category.slice(1) : 'Gambar';
+    function _renderImagePlaceholder(imageId) {
+        const label = imageId ? imageId.replace(/_/g, ' ') : 'Gambar';
         return '<div class="aijs-img-placeholder"><div class="aijs-img-placeholder-icon">🖼️</div>' +
                '<div class="aijs-img-placeholder-label">' + escHTML(label) + '</div>' +
                '<div class="aijs-img-placeholder-hint">Asset belum tersedia</div></div>';
     }
 
     function _renderImageBlock(q) {
-        if (!q.imageCategory) return '';
-        const src = _resolveImageAsset(q.imageCategory, q.imageAsset);
-        if (src) {
-            // Use data-category for onerror fallback; actual handler bound after innerHTML set
-            return '<div class="aijs-img-wrap" data-imgcat="' + escHTML(q.imageCategory) + '">' +
-                   '<img class="aijs-img-asset" src="' + escHTML(src) +
-                   '" alt="' + escHTML(q.imageCategory) + '" loading="lazy"></div>';
-        }
-        return _renderImagePlaceholder(q.imageCategory);
+        // Support both new imageId and legacy imageCategory/imageAsset
+        const imageId = q.imageId || null;
+        if (!imageId) return '';
+        const src = _resolveImageAsset(imageId);
+        return '<div class="aijs-img-wrap" data-imgid="' + escHTML(imageId) + '">' +
+               '<img class="aijs-img-asset" src="' + escHTML(src) +
+               '" alt="' + escHTML(imageId) + '" loading="lazy"></div>';
     }
 
     function _bindImageFallbacks(container) {
         container.querySelectorAll('.aijs-img-asset').forEach(img => {
             img.addEventListener('error', function() {
-                const wrap = this.closest('[data-imgcat]');
-                const cat  = wrap ? wrap.dataset.imgcat : '';
-                if (wrap) wrap.outerHTML = _renderImagePlaceholder(cat);
+                const wrap = this.closest('[data-imgid]');
+                const id   = wrap ? wrap.dataset.imgid : '';
+                if (wrap) wrap.outerHTML = _renderImagePlaceholder(id);
             });
         });
     }
@@ -166,6 +165,21 @@ const AI_JFT_SIM = (() => {
     // ── Phase 2: CHOUKAI FOUNDATION ──────────────────────────────
     // Struktur data choukai — belum ada TTS/audio, hanya fondasi.
     // { listeningText: "...", audioUrl: null, maxPlay: 2 }
+    function _docTypeLabel(docType) {
+        const map = {
+            brosur:       '📄 Brosur',
+            poster:       '🗒️ Poster',
+            jadwal:       '🗓️ Jadwal',
+            pengumuman:   '📢 Pengumuman',
+            formulir:     '📋 Formulir',
+            email:        '📧 Email',
+            chat:         '💬 Chat',
+            papan_info:   '🪧 Papan Informasi',
+            teks_bebas:   '📖 Teks',
+        };
+        return map[docType] || ('📄 ' + docType);
+    }
+
     function _renderChoukaiBadge(q) {
         if (q.questionType !== 'choukai') return '';
         return '<div class="aijs-choukai-badge">🎧 Choukai — Audio belum tersedia</div>';
@@ -390,96 +404,102 @@ const AI_JFT_SIM = (() => {
         const s = cfg.sections;
 
         const system =
-            'Kamu adalah AI pembuat soal latihan ujian JFT-Basic/JLPT untuk aplikasi belajar bahasa Jepang ' +
-            '"MNN Learning" (Rawliet.ID). Tugasmu HANYA membuat soal pilihan ganda dan membalas dalam format JSON murni.\\n\\n' +
+            'Kamu adalah AI pembuat paket soal ujian JFT-Basic/JLPT untuk aplikasi "MNN Learning" (Rawliet.ID). ' +
+            'Balas HANYA dengan satu objek JSON murni — TANPA teks, komentar, atau markdown fence.\\n\\n' +
 
-            '=== ATURAN MUTLAK ===\\n' +
-            '1. Balas HANYA dengan satu objek JSON. JANGAN tambahkan teks, komentar, atau markdown code fence.\\n' +
-            '2. Setiap soal WAJIB memiliki tepat 4 pilihan jawaban berbeda (array "options" panjang 4).\\n' +
-            '3. Field "answer" harus SAMA PERSIS (karakter demi karakter) dengan salah satu elemen "options".\\n' +
-            '4. Field "explanation" wajib Bahasa Indonesia, 1-2 kalimat, menjelaskan jawaban benar.\\n' +
-            '5. Variasikan topik — jangan mengulang pola/topik/jawaban berturut-turut.\\n' +
-            '6. Tulis kalimat Jepang biasa (campuran kanji+kana sesuai level), TANPA furigana/ruby/HTML.\\n' +
-            '7. Untuk "dokkai": gabungkan teks bacaan (3-6 kalimat) ke "question" SEBELUM kalimat tanya, pisah dengan \\\\n\\\\n.\\n\\n' +
+            '=== ATURAN UMUM ===\\n' +
+            '1. Setiap soal: tepat 4 pilihan berbeda, field "answer" SAMA PERSIS dengan salah satu "options".\\n' +
+            '2. "explanation" wajib Bahasa Indonesia, 1-2 kalimat, menjelaskan jawaban benar.\\n' +
+            '3. Variasikan topik — jangan mengulang pola/kosakata berturut-turut.\\n' +
+            '4. Tulis bahasa Jepang biasa sesuai level, TANPA furigana/ruby/HTML.\\n\\n' +
 
-            '=== ATURAN KANJI & KOTOBA — KRITIS ===\\n' +
-            'Setiap soal kanji_kotoba HARUS berupa kalimat konteks + pertanyaan. ADA 3 TIPE — pilih dan variasikan:\\n\\n' +
+            '=== KANJI & KOTOBA ===\\n' +
+            'Field "question" HANYA berisi kalimat konteks dengan target kata dalam 【】.\\n' +
+            'JANGAN tambahkan instruksi seperti "〇〇を選んでください" ke dalam field "question".\\n' +
+            'Kalimat harus dari konteks nyata (konbini, stasiun, pabrik, restoran, cuaca, belanja, rumah).\\n\\n' +
+            'Tiga tipe soal — variasikan merata:\\n' +
+            'TIPE 1 Hiragana→Kanji: kalimat SEMUA hiragana/katakana, target dalam 【】, options SEMUA kanji.\\n' +
+            '  Contoh kalimat: "スーパーで【やさい】をかいました。"\\n' +
+            '  Contoh options: "野菜" "果物" "肉" "魚"  ← semua kanji, tidak ada hiragana murni\\n' +
+            'TIPE 2 Kanji→Hiragana: kalimat berkanji, target dalam 【】, options SEMUA hiragana.\\n' +
+            '  Contoh kalimat: "工場は【遠い】です。"\\n' +
+            '  Contoh options: "とおい" "ちかい" "たかい" "やすい" ← semua hiragana\\n' +
+            'TIPE 3 Makna: kalimat berisi target dalam 【】, options SEMUA makna/deskripsi.\\n' +
+            '  Contoh kalimat: "今日は【晴れ】です。"\\n' +
+            '  Contoh options: "いい天気" "雨が降る" "雪が降る" "くもりの天気"\\n\\n' +
+            'LARANGAN KANJI_KOTOBA:\\n' +
+            '  ✗ Jangan bocorkan jawaban: kalimat ada 【遊ぶ】, jangan masukkan "遊ぶ" ke options.\\n' +
+            '  ✗ Jangan campur format options (kanji+hiragana+makna dalam satu set).\\n' +
+            '  ✗ Jangan buat distractor variasi morfologi kata sama (食べる/食べた/食べます).\\n' +
+            '  ✓ Distractor harus kata berbeda, kategori serupa.\\n\\n' +
 
-            'TIPE 1 — HIRAGANA ke KANJI\\n' +
-            'Kalimat: SEMUA hiragana/katakana, target kata dalam 【】\\n' +
-            'Contoh : こうえんで【あそぶ】ことがすきです。\\n' +
-            '         下線のことばの漢字を選んでください。\\n' +
-            'Options: HANYA kanji/mixed-kanji (contoh: 遊ぶ 学ぶ 呼ぶ 走る)\\n' +
-            'LARANGAN: jangan campur hiragana murni dan kanji dalam satu set options.\\n\\n' +
+            '=== EXPRESSION ===\\n' +
+            'Format WAJIB: dialog/situasi percakapan nyata. Bukan grammar fill-in.\\n' +
+            'Pola yang didukung:\\n' +
+            '  Pola A — Respons percakapan: tampilkan 1-2 giliran dialog, tunjukkan giliran kosong (＿＿＿).\\n' +
+            '    Contoh:\n' +
+            '    店員：いらっしゃいませ。\n客：（　　　）\n' +
+            '    Options: "ありがとうございます。" / "いただきます。" / "お邪魔します。" / "おじゃまします。"\\n' +
+            '  Pola B — Situasi kerja/tempat: deskripsi situasi + ungkapan paling tepat.\\n' +
+            '    Contoh: "上司に仕事が終わったことを伝えたいです。なんと言いますか。"\\n' +
+            '    Options: ungkapan yang tepat vs tidak tepat dalam konteks itu\\n' +
+            '  Pola C — Permintaan/instruksi: situasi + ungkapan permintaan yang sesuai.\\n' +
+            'Semua options harus ungkapan bahasa Jepang natural — bukan terjemahan Indonesia.\\n\\n' +
 
-            'TIPE 2 — KANJI ke HIRAGANA\\n' +
-            'Kalimat: berisi kanji, target kata dalam 【】\\n' +
-            'Contoh : 公園で【遊ぶ】ことが好きです。\\n' +
-            '         下線の漢字の読み方を選んでください。\\n' +
-            'Options: HANYA hiragana (contoh: あそぶ まなぶ よぶ はしる)\\n' +
-            'LARANGAN: jangan masukkan kanji apapun ke dalam options.\\n\\n' +
+            '=== CHOUKAI ===\\n' +
+            'SETIAP soal choukai WAJIB memiliki field:\\n' +
+            '  "listeningScript": array [{speaker:"male"|"female", text:"..."}]\\n' +
+            '  "maxPlay": 1 atau 2  (JFT asli biasanya 2 untuk dialog, 1 untuk pengumuman)\\n' +
+            '"question" berisi pertanyaan untuk pendengar (BUKAN isi dialog).\\n' +
+            'Variasi tipe choukai (WAJIB beragam, jangan hanya dialog 2 orang):\\n' +
+            '  - dialog 2 orang (male+female): maxPlay:2\\n' +
+            '  - pengumuman/アナウンス (1 speaker): maxPlay:1\\n' +
+            '  - instruksi kerja/pabrik (1 speaker): maxPlay:1\\n' +
+            '  - informasi stasiun/jadwal (1 speaker): maxPlay:1\\n' +
+            '  - percakapan telepon (male+female): maxPlay:2\\n' +
+            'Level N5: 1-2 baris, topik sederhana (arah, harga, barang). ' +
+            'Level N4: 2-4 baris, percakapan & pengumuman. ' +
+            'Level JFT Basic: 3-5 baris, termasuk situasi kerja & pabrik.\\n' +
+            'Jawaban HARUS bisa disimpulkan dari isi script, bukan tebak dari pilihan.\\n\\n' +
 
-            'TIPE 3 — ARTI dalam konteks\\n' +
-            'Kalimat: berisi target kata dalam 【】\\n' +
-            'Contoh : 今日は【晴れ】です。\\n' +
-            '         下線のことばの意味を選んでください。\\n' +
-            'Options: HANYA makna/deskripsi (contoh: いい天気 雨 雪 くもり)\\n' +
-            'LARANGAN: jangan ulangi kata target di options.\\n\\n' +
+            '=== DOKKAI ===\\n' +
+            'Setiap soal dokkai WAJIB memiliki field "docType" yang mendeskripsikan jenis dokumen.\\n' +
+            'Nilai docType yang didukung: "brosur" "poster" "jadwal" "pengumuman" "formulir" "email" "chat" "papan_info" "teks_bebas"\\n' +
+            'Teks bacaan (3-6 kalimat) dimasukkan ke "question" SEBELUM kalimat tanya, pisah \\\\n\\\\n.\\n' +
+            'Variasikan jenis dokumen — jangan semua teks_bebas.\\n\\n' +
 
-            '=== ATURAN OPSI PENGECOH (DISTRACTOR) ===\\n' +
-            'Opsi salah HARUS plausibel dan satu kategori dengan jawaban benar.\\n' +
-            'BURUK  : 食べ物 食べる 食べた 食べます (variasi bentuk kata yang sama)\\n' +
-            'BAGUS  : 食べ物 食み物 買い物 建物 (kata berbeda, kategori serupa)\\n\\n' +
+            '=== IMAGE SYSTEM ===\\n' +
+            'Untuk soal dengan gambar, tambahkan field "imageId" dengan nama file tanpa ekstensi.\\n' +
+            'Nama file mengikuti pola: {konteks}_{nomor} — contoh: "restaurant_menu_01", "train_schedule_02".\\n' +
+            'Konteks imageId yang didukung: restaurant_menu, train_schedule, discount_flyer, ' +
+            'notice_board, calendar, store_map, item_price, supermarket_shelf, factory_area.\\n' +
+            'Jika tidak ada gambar yang cocok, JANGAN tambahkan field imageId.\\n\\n' +
 
-            '=== VALIDASI WAJIB SEBELUM OUTPUT ===\\n' +
-            'Cek setiap soal kanji_kotoba:\\n' +
-            '  a. Apakah jawaban benar sudah muncul VERBATIM di dalam kalimat soal? Jika YA → soal INVALID, buat ulang.\\n' +
-            '     Contoh INVALID: kalimat ada 【遊ぶ】, options ada "遊ぶ" → jawaban sudah bocor di soal.\\n' +
-            '     Contoh VALID Tipe 1: kalimat ada 【あそぶ】, options ada "遊ぶ" → aman, beda skrip.\\n' +
-            '  b. Apakah semua options menggunakan format yang sama (semua kanji / semua hiragana / semua makna)? Jika TIDAK → buat ulang.\\n' +
-            '  c. Apakah ada opsi yang duplikat? Jika YA → ganti.\\n\\n' +
+            '=== QUALITY CONTROL — WAJIB SEBELUM OUTPUT ===\\n' +
+            '1. Jawaban tidak bocor verbatim di kalimat soal.\\n' +
+            '2. Hanya satu jawaban yang benar, tiga lainnya salah tapi masuk akal.\\n' +
+            '3. Tidak ada pilihan absurd atau tidak relevan konteks.\\n' +
+            '4. Tidak ada soal yang terasa seperti flashcard kosakata (kanji_kotoba tanpa konteks kalimat).\\n' +
+            '5. Semua pilihan expression adalah ungkapan bahasa Jepang natural.\\n' +
+            '6. Soal choukai harus bisa didengarkan (script natural, tidak robotik).\\n\\n' +
 
-            'Konteks kalimat WAJIB dari kehidupan sehari-hari: cuaca, konbini, restoran, stasiun, pekerjaan, pabrik, rumah, belanja, atau transportasi.\\n' +
-            'Kata target WAJIB diapit tanda 【 】 di dalam kalimat.\\n\\n' +
-            'KONTEKS LEVEL: ' + levelGuide + '\\n' +
-            'CHOUKAI PER LEVEL — N5: dialog pendek 1-2 baris, topik sederhana (arah, harga, jadwal). ' +
-            'N4: 2-4 baris, topik lebih variatif. JFT Basic: 3-5 baris, pengumuman/tempat kerja/pabrik.';
+            'KONTEKS LEVEL: ' + levelGuide;
 
         const user =
-            'Buatkan SATU paket soal latihan "AI JFT Simulation" level "' + levelLabel + '" dengan struktur JSON berikut ' +
-            '(jumlah soal per section harus TEPAT sesuai angka yang diminta):\\n\\n' +
-            '{\\n' +
-            '  "sections": {\\n' +
-            '    "kanji_kotoba": [ /* ' + s.kanji_kotoba + ' soal */ ],\\n' +
-            '    "expression":   [ /* ' + s.expression   + ' soal */ ],\\n' +
-            '    "dokkai":       [ /* ' + s.dokkai       + ' soal */ ],\\n' +
-            '    "choukai":      [ /* ' + s.choukai      + ' soal */ ]\\n' +
-            '  }\\n' +
-            '}\\n\\n' +
-            'Setiap elemen soal HARUS berbentuk:\\n' +
-            '{ "question": "...", "options": ["...","...","...","..."], "answer": "...", "explanation": "..." }\\n\\n' +
-            'PERINGATAN KANJI_KOTOBA:\\n' +
-            '  - Tipe 1 (hiragana→kanji): kalimat SEMUA hiragana, options SEMUA kanji.\\n' +
-            '  - Tipe 2 (kanji→hiragana): kalimat berkanji, options SEMUA hiragana.\\n' +
-            '  - Tipe 3 (arti): options SEMUA makna/deskripsi, BUKAN kanji atau hiragana dari kata target.\\n' +
-            '  - JANGAN campurkan format options dalam satu soal.\\n' +
-            '  - VALIDASI: jawaban benar TIDAK BOLEH muncul verbatim di kalimat soal.\\n\\n' +
-            'Section "expression": melengkapi kalimat / pola tata bahasa (gaya soal isian ujian JFT asli).\\n' +
-            'Section "dokkai": pemahaman membaca dengan teks bacaan singkat (lihat aturan #7).\\n' +
-            'Section "choukai": soal mendengarkan — WAJIB gunakan format KHUSUS berikut (lihat penjelasan di bawah).\\n\\n' +
-            'FORMAT KHUSUS CHOUKAI:\\n' +
-            'Setiap soal choukai HARUS memiliki field tambahan "listeningScript": array of {speaker, text}.\\n' +
-            'Struktur soal choukai:\\n' +
-            '{ "question": "...", "listeningScript": [{"speaker":"male","text":"..."},{"speaker":"female","text":"..."}], "options": ["...","...","...","..."], "answer": "...", "explanation": "..." }\\n\\n' +
-            'ATURAN CHOUKAI:\\n' +
-            '  - "question" berisi pertanyaan yang harus dijawab pendengar (bukan dialog).\\n' +
-            '  - "listeningScript" berisi dialog antar pembicara. speaker hanya boleh: "male" atau "female".\\n' +
-            '  - Setiap elemen script: { "speaker": "male"|"female", "text": "kalimat Jepang" }\\n' +
-            '  - Konteks dialog: kehidupan sehari-hari (stasiun, kantor, konbini, pabrik, restoran, telepon, pengumuman).\\n' +
-            '  - N5: 1-2 baris dialog. N4: 2-4 baris. JFT Basic: 3-5 baris + variasi topik.\\n' +
-            '  - Jawaban harus bisa disimpulkan dari dialog, BUKAN dari pertanyaan tertulis saja.\\n' +
-            '  - Options: 4 pilihan, hanya satu yang benar berdasarkan isi dialog.\\n\\n' +
-            'Balas LANGSUNG dengan objek JSON saja, tanpa penjelasan apapun di luar JSON.';
+            'Buatkan SATU paket ujian "AI JFT Simulation" level "' + levelLabel + '". ' +
+            'Jumlah soal per section HARUS TEPAT sesuai angka berikut:\\n\\n' +
+            '  kanji_kotoba : ' + s.kanji_kotoba + ' soal\\n' +
+            '  expression   : ' + s.expression   + ' soal\\n' +
+            '  dokkai       : ' + s.dokkai       + ' soal\\n' +
+            '  choukai      : ' + s.choukai      + ' soal\\n\\n' +
+            'Struktur JSON yang HARUS dikembalikan:\\n' +
+            '{ "sections": { "kanji_kotoba":[...], "expression":[...], "dokkai":[...], "choukai":[...] } }\\n\\n' +
+            'Format soal standar: { "question":"...", "options":["...","...","...","..."], "answer":"...", "explanation":"..." }\\n' +
+            'Format choukai  : tambahkan "listeningScript":[{speaker,text},...] dan "maxPlay":1|2\\n' +
+            'Format dokkai   : tambahkan "docType":"..."\\n' +
+            'Format bergambar: tambahkan "imageId":"..." (hanya jika gambar relevan dan tersedia)\\n\\n' +
+            'INGAT untuk kanji_kotoba: "question" HANYA kalimat konteks dengan 【target】, TANPA instruksi apapun.\\n' +
+            'Balas LANGSUNG dengan JSON saja.';
 
         return { system, user };
     }
@@ -603,10 +623,12 @@ const AI_JFT_SIM = (() => {
                 completed:     false,
                 sectionScores: {},
                 questions:     sections,
-                // Phase 2 fields
-                timerSeconds:  cfg.timerSeconds || 0,
+                // Phase 2
+                timerSeconds:   cfg.timerSeconds || 0,
                 durationSeconds: null,
-                sectionType:   'standard',
+                sectionType:    'standard',
+                // V2
+                schemaVersion:  2,
             });
 
             // ── POTONG CREDIT — hanya sampai titik ini jika semua di atas berhasil ──
@@ -864,19 +886,33 @@ const AI_JFT_SIM = (() => {
                        '<span class="aijs-script-text">' + escHTML(l.text || '') + '</span></div>';
             }).join('');
             player.innerHTML = '<div class="aijs-script-box">' + lines + '</div>' +
-                (_TTS.ALLOW_REPLAY && _TTS._hasJpVoice() && Array.isArray(q.listeningScript)
+                (_TTS.ALLOW_REPLAY && _TTS._hasJpVoice() && Array.isArray(q.listeningScript) && (q.maxPlay || 2) > 1
                     ? '<button class="aijs-replay-btn" id="aijs-replay-btn">🔁 Putar Ulang</button>'
                     : '');
             const replayBtn = document.getElementById('aijs-replay-btn');
             if (replayBtn) {
+                // maxPlay: 1 = sekali saja, 2 = boleh ulang (default JFT: 2)
+                const maxPlay  = (typeof q.maxPlay === 'number') ? q.maxPlay : 2;
+                let   playCount = 1; // sudah diputar sekali otomatis
+                const updateReplayBtn = () => {
+                    if (playCount >= maxPlay) {
+                        replayBtn.disabled = true;
+                        replayBtn.textContent = '🔇 Batas putar tercapai';
+                    }
+                };
                 replayBtn.addEventListener('click', () => {
+                    if (playCount >= maxPlay) return;
                     replayBtn.disabled = true;
                     replayBtn.textContent = '⏸ Memutar...';
                     _TTS.speak(q.listeningScript, () => {
+                        playCount++;
                         replayBtn.disabled = false;
-                        replayBtn.textContent = '🔁 Putar Ulang';
+                        replayBtn.textContent = '🔁 Putar Ulang (' + playCount + '/' + maxPlay + ')';
+                        updateReplayBtn();
                     });
                 });
+                replayBtn.textContent = '🔁 Putar Ulang (1/' + maxPlay + ')';
+                updateReplayBtn();
             }
         }
 

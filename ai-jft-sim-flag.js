@@ -243,3 +243,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, 1500);
 });
+
+// ─────────────────────────────────────────────────────────────────
+// ALIAS: AI_JFT_ENABLED
+// Spec V2 menyebut flag ini sebagai "AI_JFT_ENABLED".
+// Alias ini meneruskan ke AI_JFT_FLAG tanpa duplikasi logika.
+// Gunakan AI_JFT_ENABLED.isEnabled() untuk cek sederhana.
+// ─────────────────────────────────────────────────────────────────
+window.AI_JFT_ENABLED = {
+    /** @returns {Promise<boolean>} true jika fitur aktif untuk user saat ini */
+    async isEnabled() {
+        const result = await AI_JFT_FLAG.checkAccess();
+        return result.allowed;
+    },
+    /** Sama dengan AI_JFT_FLAG.updateCardVisibility() */
+    updateCardVisibility: () => AI_JFT_FLAG.updateCardVisibility(),
+    /** Force refresh config dari Firestore */
+    refresh: () => AI_JFT_FLAG.refresh(),
+};
