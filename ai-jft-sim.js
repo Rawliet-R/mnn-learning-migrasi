@@ -54,9 +54,9 @@ const AI_JFT_SIM = (() => {
     const MODEL = 'openai/gpt-4o-mini';
 
     const LEVELS = {
-        n5:        'N5',
-        n4:        'N4',
-        jft_basic: 'JFT Basic',
+        n5:        'A1 Pemula',
+        n4:        'A2 Awal Kerja',
+        jft_basic: 'A2+ Siap Kerja',
     };
 
     // Pembagian soal per section (kanji_kotoba/expression/dokkai) adalah
@@ -101,6 +101,14 @@ const AI_JFT_SIM = (() => {
         const uid = window.AUTH?.user?.uid;
         if (!uid || window.AUTH?.user?.isGuest || typeof _fbDb === 'undefined') return null;
         return _fbDb.collection('users').doc(uid).collection('aiJftSessions');
+    }
+
+    // V3: aiJftHistory — koleksi baru untuk riwayat paket ujian
+    // aiJftSessions tetap dipertahankan agar session lama tidak hilang.
+    function _historyRef() {
+        const uid = window.AUTH?.user?.uid;
+        if (!uid || window.AUTH?.user?.isGuest || typeof _fbDb === 'undefined') return null;
+        return _fbDb.collection('users').doc(uid).collection('aiJftHistory');
     }
 
     function _flattenSections(sections) {
@@ -457,9 +465,9 @@ const AI_JFT_SIM = (() => {
             '  - instruksi kerja/pabrik (1 speaker): maxPlay:1\\n' +
             '  - informasi stasiun/jadwal (1 speaker): maxPlay:1\\n' +
             '  - percakapan telepon (male+female): maxPlay:2\\n' +
-            'Level N5: 1-2 baris, topik sederhana (arah, harga, barang). ' +
-            'Level N4: 2-4 baris, percakapan & pengumuman. ' +
-            'Level JFT Basic: 3-5 baris, termasuk situasi kerja & pabrik.\\n' +
+            'A1 Pemula: 1-2 baris, topik sangat sederhana (arah, harga, nama barang). ' +
+            'A2 Awal Kerja: 2-4 baris, percakapan & pengumuman pendek. ' +
+            'A2+ Siap Kerja: 3-5 baris, situasi kerja, pabrik, instruksi, pengumuman.\\n' +
             'Jawaban HARUS bisa disimpulkan dari isi script, bukan tebak dari pilihan.\\n\\n' +
 
             '=== DOKKAI ===\\n' +
@@ -481,7 +489,11 @@ const AI_JFT_SIM = (() => {
             '3. Tidak ada pilihan absurd atau tidak relevan konteks.\\n' +
             '4. Tidak ada soal yang terasa seperti flashcard kosakata (kanji_kotoba tanpa konteks kalimat).\\n' +
             '5. Semua pilihan expression adalah ungkapan bahasa Jepang natural.\\n' +
-            '6. Soal choukai harus bisa didengarkan (script natural, tidak robotik).\\n\\n' +
+            '6. Soal choukai harus bisa didengarkan (script natural, tidak robotik).\\n' +
+            '7. JANGAN gunakan karakter literal \\\\n atau \\\\t di dalam value string JSON — gunakan spasi atau baris baru yang sebenarnya.\\n' +
+            '8. JANGAN tampilkan format rusak (karakter backslash n) ke user.\\n' +
+            '9. Semua soal choukai WAJIB memiliki listeningScript dengan minimal 1 elemen.\\n' +
+            '10. Dokkai harus mudah dibaca — kalimat jelas, tidak ambigu, teks bacaan relevan dengan pertanyaan.\\n\\n' +
 
             'KONTEKS LEVEL: ' + levelGuide;
 
@@ -627,9 +639,24 @@ const AI_JFT_SIM = (() => {
                 timerSeconds:   cfg.timerSeconds || 0,
                 durationSeconds: null,
                 sectionType:    'standard',
-                // V2
-                schemaVersion:  2,
+                // V3
+                schemaVersion:  3,
             });
+
+            // V3: dual-write ke aiJftHistory (non-blocking)
+            const histRef = _historyRef();
+            if (histRef) {
+                histRef.doc(sessionId).set({
+                    examId:    sessionId,
+                    level:     levelId,
+                    mode:      modeId,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    sections,
+                    answers:   [],
+                    score:     null,
+                    completed: false,
+                }).catch(() => {});
+            }
 
             // ── POTONG CREDIT — hanya sampai titik ini jika semua di atas berhasil ──
             await AI_SENSEI.deductCredit(cfg.credit);
@@ -735,11 +762,13 @@ const AI_JFT_SIM = (() => {
 
     function _updateTimerDisplay() {
         const el = document.getElementById('aijs-timer-display');
-        if (!el) return;
-        const m  = Math.floor(_timerRemaining / 60);
-        const s  = _timerRemaining % 60;
-        el.textContent = m + ':' + String(s).padStart(2, '0');
-        el.classList.toggle('aijs-timer-warning', _timerRemaining <= 60);
+        if (el) {
+            const m = Math.floor(_timerRemaining / 60);
+            const s = _timerRemaining % 60;
+            el.textContent = m + ':' + String(s).padStart(2, '0');
+            el.classList.toggle('aijs-timer-warning', _timerRemaining <= 60);
+        }
+        _syncTimerHero(); // V3: sync hero timer juga
     }
 
     function _getElapsedSeconds() {
@@ -762,7 +791,42 @@ const AI_JFT_SIM = (() => {
         if (_activeSession.currentIndex === 0 && _activeSession.timerSeconds > 0 && !_timerInterval) {
             _startTimer(_activeSession.timerSeconds);
         }
+        // V3: inject timer hero into session body BEFORE question
+        _renderTimerHero();
         _renderCurrentQuestion();
+    }
+
+    function _renderTimerHero() {
+        // Timer hero: block di atas soal, update bersama _updateTimerDisplay
+        const body = document.getElementById('aijs-session-body');
+        if (!body) return;
+        // Hanya inject sekali; jika sudah ada skip
+        if (document.getElementById('aijs-timer-hero')) return;
+        const hero = document.createElement('div');
+        hero.id = 'aijs-timer-hero';
+        hero.className = 'aijs-timer-hero';
+        const s = _activeSession;
+        const totalSections = SECTION_ORDER.filter(sec => (s.sections[sec]||[]).length > 0).length;
+        const flat = s.flat[s.currentIndex] || {};
+        const secLabel = SECTION_LABELS[flat.section] || '—';
+        const secIndex = SECTION_ORDER.filter(sec => (s.sections[sec]||[]).length > 0)
+                                      .indexOf(flat.section) + 1;
+        hero.innerHTML =
+            '<div class="aijs-timer-hero-time" id="aijs-timer-hero-time">—</div>' +
+            '<div class="aijs-timer-hero-label">WAKTU TERSISA</div>' +
+            '<div class="aijs-timer-hero-section">' + escHTML(secLabel) + '</div>' +
+            '<div class="aijs-timer-hero-pos">Section ' + secIndex + '/' + totalSections + '</div>';
+        body.insertBefore(hero, body.firstChild);
+        _syncTimerHero();
+    }
+
+    function _syncTimerHero() {
+        const el = document.getElementById('aijs-timer-hero-time');
+        if (!el) return;
+        const m = Math.floor(_timerRemaining / 60);
+        const sc = _timerRemaining % 60;
+        el.textContent = m + ':' + String(sc).padStart(2, '0');
+        el.classList.toggle('aijs-timer-hero-warning', _timerRemaining <= 60);
     }
 
     function _bindSessionTopbarOnce() {
