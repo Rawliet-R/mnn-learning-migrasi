@@ -507,9 +507,8 @@ function getLessonForVocab(v) {
 function getAllVocab() {
     // Lesson-based vocab for quiz/flashcard — includes master if ready
     const dbVocab = Object.values(DB).flat().flatMap(l => l.vocab||[]);
-    const masterVocab = (window.MASTER_KOTOBA_READY && window.MASTER_KOTOBA)
-        ? window.MASTER_KOTOBA : [];
-    return [...dbVocab, ...masterVocab];
+    // [v2.7.5] master_kotoba sudah di-merge ke book3, tidak perlu digabung lagi
+    return [...dbVocab];
 }
 function totalVocab() { return getAllVocab().length; }
 function learnedKey(v) { return (v.kana||v.kanji||'') + '||' + v.arti; }
@@ -4968,7 +4967,7 @@ function doEditSave() {
 function getAllVocabCount() {
     let n = 0;
     ['book1','book2'].forEach(b => { if (DB[b]) DB[b].forEach(l => { n += (l.vocab||[]).length; }); });
-    if (window.MASTER_KOTOBA_READY) n += window.MASTER_KOTOBA.length;
+    // [v2.7.5] master_kotoba sudah di-merge ke book3, tidak perlu dihitung lagi
     return n;
 }
 
@@ -5017,6 +5016,10 @@ function getAllFavIds() {
 
 // ── Load master_kotoba.json async ─────────────────────
 async function loadMasterKotoba() {
+    // [v2.7.5] Disabled — data sudah di-merge ke data.js book3
+    window.MASTER_KOTOBA_READY = true;
+    window.MASTER_KOTOBA = [];
+    return;
     if (window.MASTER_KOTOBA_READY) return;
     try {
         const resp = await fetch('./master_kotoba.json');
@@ -5159,16 +5162,9 @@ function getKotobaAllVocab() {
         });
     });
 
-    // 2. From master_kotoba.json (already deduped on load)
-    if (window.MASTER_KOTOBA_READY) {
-        window.MASTER_KOTOBA.forEach(v => {
-            results.push({
-                ...v,
-                _book: 'master', _lesson: 0, _lessonTitle: 'Master Kotoba',
-                _cat: detectCat(v), _src: 'master',
-            });
-        });
-    }
+    // 2. [DISABLED v2.7.5] master_kotoba.json sudah di-merge ke data.js book3
+    //    Tidak perlu load lagi untuk hindari duplikat
+    // if (window.MASTER_KOTOBA_READY) { ... }
 
     return results;
 }
@@ -5743,7 +5739,6 @@ function renderKotobaPage() {
 
     // Update count & subtitle
     if (countEl) {
-        const masterCount = window.MASTER_KOTOBA.length;
         const dbCount     = getAllVocabCount();
         countEl.textContent = totalFiltered.toLocaleString() +
             (isFullAccess ? '' : `/${getAllVocabCount()}`) + ' kata';
