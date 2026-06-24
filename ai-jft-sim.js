@@ -51,7 +51,7 @@ const AI_JFT_SIM = (() => {
     // Ini adalah model default yang sudah ada di api/ai-proxy.js
     // & netlify/functions/ai-proxy.js saat field "model" tidak dikirim,
     // di sini dikirim eksplisit agar jelas di kode.
-    const MODEL = 'google/gemini-2.0-flash-001';
+    const MODEL = 'google/openai/gpt-4o-mini';
 
     const LEVELS = {
         n5:        'N5',
