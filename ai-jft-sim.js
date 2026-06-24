@@ -51,22 +51,21 @@ const AI_JFT_SIM = (() => {
     // Ini adalah model default yang sudah ada di api/ai-proxy.js
     // & netlify/functions/ai-proxy.js saat field "model" tidak dikirim,
     // di sini dikirim eksplisit agar jelas di kode.
-    const MODEL = 'openai/gpt-4o-mini';
+    const MODEL = 'google/gemini-2.0-flash-001';
 
     const LEVELS = {
         n5:        'N5',
         n4:        'N4',
         jft_basic: 'JFT Basic',
-        ssw:       'SSW',
     };
 
     // Pembagian soal per section (kanji_kotoba/expression/dokkai) adalah
     // DEFAULT yang bisa disesuaikan kapan saja — total soal & credit cost
     // mengikuti spesifikasi persis dari permintaan awal.
     const MODES = {
-        easy:   { label: 'Easy',   totalSoal: 10, credit: 5,  maxTokens: 2200, sections: { kanji_kotoba: 4,  expression: 3,  dokkai: 3  } },
-        normal: { label: 'Normal', totalSoal: 20, credit: 10, maxTokens: 4200, sections: { kanji_kotoba: 8,  expression: 6,  dokkai: 6  } },
-        full:   { label: 'Full',   totalSoal: 40, credit: 20, maxTokens: 8200, sections: { kanji_kotoba: 16, expression: 12, dokkai: 12 } },
+        easy:   { label: 'Easy',   totalSoal: 10, credit: 5,  maxTokens: 2200, timerSeconds: 900,  sections: { kanji_kotoba: 4,  expression: 3,  dokkai: 3  } },
+        normal: { label: 'Normal', totalSoal: 20, credit: 10, maxTokens: 4200, timerSeconds: 1800, sections: { kanji_kotoba: 8,  expression: 6,  dokkai: 6  } },
+        full:   { label: 'Full',   totalSoal: 40, credit: 20, maxTokens: 8200, timerSeconds: 3600, sections: { kanji_kotoba: 16, expression: 12, dokkai: 12 } },
     };
 
     // Urutan tampil tetap — Phase 1 belum ada choukai.
@@ -90,6 +89,11 @@ const AI_JFT_SIM = (() => {
     let _setupBound          = false;
     let _sessionTopbarBound  = false;
 
+    // ── Phase 2: Timer ──
+    let _timerInterval   = null;  // setInterval handle
+    let _timerRemaining  = 0;     // detik tersisa
+    let _sessionStartTs  = null;  // Date.now() saat sesi mulai (untuk durasi)
+
     // ─────────────────────────────────────────────────────
     // HELPERS — Firestore
     // ─────────────────────────────────────────────────────
@@ -107,15 +111,64 @@ const AI_JFT_SIM = (() => {
         return flat;
     }
 
-    function _buildActiveSession(sessionId, level, mode, creditCost, sections, existingAnswers) {
+    function _buildActiveSession(sessionId, level, mode, creditCost, sections, existingAnswers, timerSeconds) {
         return {
             sessionId, level, mode, creditCost,
-            sections,                          // { kanji_kotoba:[...], expression:[...], dokkai:[...] }
-            flat: _flattenSections(sections),  // urutan tampil flat
+            sections,                           // { kanji_kotoba:[...], expression:[...], dokkai:[...] }
+            flat: _flattenSections(sections),   // urutan tampil flat
             currentIndex: 0,
-            answers: existingAnswers || [],    // [{section, selectedIndex, correct}]
+            answers: existingAnswers || [],     // [{section, selectedIndex, correct}]
             answered: false,
+            timerSeconds: timerSeconds || 0,    // Phase 2: durasi timer mode ini
         };
+    }
+
+    // ── Phase 2: IMAGE FRAMEWORK ──────────────────────────────────
+    // Kategori gambar yang didukung dan path asset-nya.
+    // Saat folder asset tersedia, sistem langsung bisa pakai tanpa refactor.
+    const IMAGE_CATEGORIES = ['brochure','schedule','menu','notice','map','workplace','sign','story'];
+    const IMAGE_ASSET_BASE = '/assets/jft/';
+
+    function _resolveImageAsset(category, assetName) {
+        if (!category || !assetName) return null;
+        return IMAGE_ASSET_BASE + category + '/' + assetName;
+    }
+
+    function _renderImagePlaceholder(category) {
+        const label = category ? category.charAt(0).toUpperCase() + category.slice(1) : 'Gambar';
+        return '<div class="aijs-img-placeholder"><div class="aijs-img-placeholder-icon">🖼️</div>' +
+               '<div class="aijs-img-placeholder-label">' + escHTML(label) + '</div>' +
+               '<div class="aijs-img-placeholder-hint">Asset belum tersedia</div></div>';
+    }
+
+    function _renderImageBlock(q) {
+        if (!q.imageCategory) return '';
+        const src = _resolveImageAsset(q.imageCategory, q.imageAsset);
+        if (src) {
+            // Use data-category for onerror fallback; actual handler bound after innerHTML set
+            return '<div class="aijs-img-wrap" data-imgcat="' + escHTML(q.imageCategory) + '">' +
+                   '<img class="aijs-img-asset" src="' + escHTML(src) +
+                   '" alt="' + escHTML(q.imageCategory) + '" loading="lazy"></div>';
+        }
+        return _renderImagePlaceholder(q.imageCategory);
+    }
+
+    function _bindImageFallbacks(container) {
+        container.querySelectorAll('.aijs-img-asset').forEach(img => {
+            img.addEventListener('error', function() {
+                const wrap = this.closest('[data-imgcat]');
+                const cat  = wrap ? wrap.dataset.imgcat : '';
+                if (wrap) wrap.outerHTML = _renderImagePlaceholder(cat);
+            });
+        });
+    }
+
+    // ── Phase 2: CHOUKAI FOUNDATION ──────────────────────────────
+    // Struktur data choukai — belum ada TTS/audio, hanya fondasi.
+    // { listeningText: "...", audioUrl: null, maxPlay: 2 }
+    function _renderChoukaiBadge(q) {
+        if (q.questionType !== 'choukai') return '';
+        return '<div class="aijs-choukai-badge">🎧 Choukai — Audio belum tersedia</div>';
     }
 
     // ─────────────────────────────────────────────────────
@@ -250,33 +303,53 @@ const AI_JFT_SIM = (() => {
 
         const system =
             'Kamu adalah AI pembuat soal latihan ujian JFT-Basic/JLPT untuk aplikasi belajar bahasa Jepang ' +
-            '"MNN Learning" (Rawliet.ID). Tugasmu HANYA membuat soal pilihan ganda dan membalas dalam format JSON murni.\n\n' +
-            'ATURAN MUTLAK:\n' +
-            '1. Balas HANYA dengan satu objek JSON. JANGAN tambahkan teks, komentar, atau markdown code fence apa pun di luar JSON.\n' +
-            '2. Setiap soal WAJIB memiliki tepat 4 pilihan jawaban berbeda (array "options" panjang 4).\n' +
-            '3. Field "answer" harus berupa string yang SAMA PERSIS (karakter demi karakter) dengan salah satu isi "options".\n' +
-            '4. Field "explanation" wajib Bahasa Indonesia, singkat (1-2 kalimat), menjelaskan kenapa jawaban itu benar.\n' +
+            '"MNN Learning" (Rawliet.ID). Tugasmu HANYA membuat soal pilihan ganda dan membalas dalam format JSON murni.\\n\\n' +
+            'ATURAN MUTLAK:\\n' +
+            '1. Balas HANYA dengan satu objek JSON. JANGAN tambahkan teks, komentar, atau markdown code fence apa pun di luar JSON.\\n' +
+            '2. Setiap soal WAJIB memiliki tepat 4 pilihan jawaban berbeda (array "options" panjang 4).\\n' +
+            '3. Field "answer" harus berupa string yang SAMA PERSIS (karakter demi karakter) dengan salah satu isi "options".\\n' +
+            '4. Field "explanation" wajib Bahasa Indonesia, singkat (1-2 kalimat), menjelaskan kenapa jawaban itu benar.\\n' +
             '5. Untuk soal section "dokkai", gabungkan teks bacaan singkat (3-6 kalimat bahasa Jepang) ke dalam field "question" ' +
-            'SEBELUM kalimat pertanyaan, dipisah dua baris baru (\\n\\n), lalu diikuti pertanyaan pemahamannya.\n' +
-            '6. Variasikan topik antar soal — jangan mengulang pola/topik/jawaban yang sama berturut-turut.\n' +
-            '7. Tulis kalimat Jepang biasa (campuran kanji+kana sesuai level), TANPA furigana/ruby/HTML.\n\n' +
+            'SEBELUM kalimat pertanyaan, dipisah dua baris baru (\\\\n\\\\n), lalu diikuti pertanyaan pemahamannya.\\n' +
+            '6. Variasikan topik antar soal \u2014 jangan mengulang pola/topik/jawaban yang sama berturut-turut.\\n' +
+            '7. Tulis kalimat Jepang biasa (campuran kanji+kana sesuai level), TANPA furigana/ruby/HTML.\\n\\n' +
+            'ATURAN KHUSUS SECTION "kanji_kotoba" \u2014 WAJIB DIIKUTI:\\n' +
+            'DILARANG KERAS membuat pertanyaan langsung seperti:\\n' +
+            '  \u2717 \u300c\u3007\u3007\u300d\u306e\u610f\u5473\u306f\u4f55\u3067\u3059\u304b\u3002\\n' +
+            '  \u2717 \u300c\u3007\u3007\u300d\u306e\u8aad\u307f\u65b9\u306f\u4f55\u3067\u3059\u304b\u3002\\n' +
+            'SEMUA soal kanji_kotoba HARUS menggunakan KALIMAT KONTEKS dulu, lalu pertanyaan.\\n' +
+            'Gunakan format berikut (pilih salah satu tipe per soal, variasikan):\\n' +
+            '  Tipe A \u2014 Hiragana\u2192Kanji:\\n' +
+            '    \u30b9\u30fc\u30d1\u30fc\u3067\u3010\u3084\u3055\u3044\u3011\u3092\u304b\u3044\u307e\u3057\u305f\u3002\\n' +
+            '    \u4e0b\u7dda\u306e\u3053\u3068\u3070\u306e\u6f22\u5b57\u3092\u9078\u3093\u3067\u304f\u3060\u3055\u3044\u3002\\n' +
+            '  Tipe B \u2014 Kanji\u2192Hiragana:\\n' +
+            '    \u5de5\u5834\u306f\u3010\u9060\u3044\u3011\u3067\u3059\u3002\\n' +
+            '    \u4e0b\u7dda\u306e\u6f22\u5b57\u306e\u8aad\u307f\u65b9\u3092\u9078\u3093\u3067\u304f\u3060\u3055\u3044\u3002\\n' +
+            '  Tipe C \u2014 Arti dalam konteks:\\n' +
+            '    \u4eca\u65e5\u306f\u3010\u6674\u308c\u3011\u3067\u3059\u3002\\n' +
+            '    \u4e0b\u7dda\u306e\u3053\u3068\u3070\u306e\u610f\u5473\u3092\u9078\u3093\u3067\u304f\u3060\u3055\u3044\u3002\\n' +
+            '  Tipe D \u2014 Padanan kata:\\n' +
+            '    \u3053\u306e\u306b\u3082\u3064\u306f\u3010\u91cd\u3044\u3011\u3067\u3059\u3002\\n' +
+            '    \u4e0b\u7dda\u306e\u3053\u3068\u3070\u3068\u540c\u3058\u610f\u5473\u306e\u3082\u306e\u3092\u9078\u3093\u3067\u304f\u3060\u3055\u3044\u3002\\n' +
+            'Konteks kalimat WAJIB dari kehidupan sehari-hari: cuaca, konbini, restoran, stasiun, pekerjaan, pabrik, rumah, belanja, atau transportasi.\\n' +
+            'Kata target WAJIB diapit tanda \u3010 \u3011 di dalam kalimat konteks.\\n\\n' +
             'KONTEKS LEVEL: ' + levelGuide;
 
         const user =
             'Buatkan SATU paket soal latihan "AI JFT Simulation" level "' + levelLabel + '" dengan struktur JSON berikut ' +
-            '(jumlah soal per section harus TEPAT sesuai angka yang diminta):\n\n' +
-            '{\n' +
-            '  "sections": {\n' +
-            '    "kanji_kotoba": [ /* ' + s.kanji_kotoba + ' soal */ ],\n' +
-            '    "expression":   [ /* ' + s.expression   + ' soal */ ],\n' +
-            '    "dokkai":       [ /* ' + s.dokkai       + ' soal */ ]\n' +
-            '  }\n' +
-            '}\n\n' +
-            'Setiap elemen soal di tiap array HARUS persis berbentuk:\n' +
-            '{ "question": "...", "options": ["...","...","...","..."], "answer": "...", "explanation": "..." }\n\n' +
-            'Section "kanji_kotoba": arti/cara baca kanji atau kosakata yang tepat untuk suatu konteks kalimat.\n' +
-            'Section "expression": melengkapi kalimat / pola tata bahasa (gaya soal isian seperti pada ujian JFT asli).\n' +
-            'Section "dokkai": pemahaman membaca dengan teks bacaan singkat (lihat aturan #5 di atas).\n\n' +
+            '(jumlah soal per section harus TEPAT sesuai angka yang diminta):\\n\\n' +
+            '{\\n' +
+            '  "sections": {\\n' +
+            '    "kanji_kotoba": [ /* ' + s.kanji_kotoba + ' soal */ ],\\n' +
+            '    "expression":   [ /* ' + s.expression   + ' soal */ ],\\n' +
+            '    "dokkai":       [ /* ' + s.dokkai       + ' soal */ ]\\n' +
+            '  }\\n' +
+            '}\\n\\n' +
+            'Setiap elemen soal di tiap array HARUS persis berbentuk:\\n' +
+            '{ "question": "...", "options": ["...","...","...","..."], "answer": "...", "explanation": "..." }\\n\\n' +
+            'Section "kanji_kotoba": WAJIB format kalimat konteks + pertanyaan (lihat ATURAN KHUSUS di atas). DILARANG format \u300c\u3007\u3007\u300d\u306e\u610f\u5473/\u8aad\u307f\u65b9\u306f\u4f55\u3067\u3059\u304b.\\n' +
+            'Section "expression": melengkapi kalimat / pola tata bahasa (gaya soal isian seperti pada ujian JFT asli).\\n' +
+            'Section "dokkai": pemahaman membaca dengan teks bacaan singkat (lihat aturan #5 di atas).\\n\\n' +
             'Balas LANGSUNG dengan objek JSON-nya saja, tanpa penjelasan apa pun di luar JSON.';
 
         return { system, user };
@@ -395,6 +468,10 @@ const AI_JFT_SIM = (() => {
                 completed:     false,
                 sectionScores: {},
                 questions:     sections,
+                // Phase 2 fields
+                timerSeconds:  cfg.timerSeconds || 0,
+                durationSeconds: null,
+                sectionType:   'standard',
             });
 
             // ── POTONG CREDIT — hanya sampai titik ini jika semua di atas berhasil ──
@@ -405,7 +482,7 @@ const AI_JFT_SIM = (() => {
                 window.AI_ANALYTICS?.track?.('AI JFT Simulation', cfg.credit, prompt.user.length, raw.length, true);
             } catch (e) {}
 
-            _activeSession = _buildActiveSession(sessionId, levelId, modeId, cfg.credit, sections, []);
+            _activeSession = _buildActiveSession(sessionId, levelId, modeId, cfg.credit, sections, [], cfg.timerSeconds);
 
             _hideGeneratingOverlay();
             _generating = false;
@@ -479,7 +556,41 @@ const AI_JFT_SIM = (() => {
     // SESSION PAGE — practice flow (tanpa panggilan AI lagi)
     // ─────────────────────────────────────────────────────
 
-    function renderSessionPage() {
+    // ── Phase 2: TIMER ───────────────────────────────────────────
+    function _startTimer(seconds) {
+        _clearTimer();
+        _timerRemaining  = seconds;
+        _sessionStartTs  = Date.now();
+        _updateTimerDisplay();
+        _timerInterval = setInterval(() => {
+            _timerRemaining -= 1;
+            _updateTimerDisplay();
+            if (_timerRemaining <= 0) {
+                _clearTimer();
+                _finishSession(true); // true = time-up
+            }
+        }, 1000);
+    }
+
+    function _clearTimer() {
+        if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
+    }
+
+    function _updateTimerDisplay() {
+        const el = document.getElementById('aijs-timer-display');
+        if (!el) return;
+        const m  = Math.floor(_timerRemaining / 60);
+        const s  = _timerRemaining % 60;
+        el.textContent = m + ':' + String(s).padStart(2, '0');
+        el.classList.toggle('aijs-timer-warning', _timerRemaining <= 60);
+    }
+
+    function _getElapsedSeconds() {
+        if (!_sessionStartTs) return 0;
+        return Math.round((Date.now() - _sessionStartTs) / 1000);
+    }
+
+        function renderSessionPage() {
         _bindSessionTopbarOnce();
 
         if (_sessionLoading) {
@@ -487,9 +598,12 @@ const AI_JFT_SIM = (() => {
             return;
         }
         if (!_activeSession) {
-            // Tidak ada sesi aktif di memori (reload / navigasi langsung) → kembali ke setup
             navigateTo('ai-jft-setup');
             return;
+        }
+        // Phase 2: start timer only on fresh session (index 0), not on re-render
+        if (_activeSession.currentIndex === 0 && _activeSession.timerSeconds > 0 && !_timerInterval) {
+            _startTimer(_activeSession.timerSeconds);
         }
         _renderCurrentQuestion();
     }
@@ -505,6 +619,7 @@ const AI_JFT_SIM = (() => {
             if (midSession && !confirm('Keluar dari sesi ini? Progress yang belum selesai tidak akan tersimpan.')) {
                 return;
             }
+            _clearTimer();
             _activeSession = null;
             navigateTo('ai-jft-setup');
         });
@@ -541,7 +656,13 @@ const AI_JFT_SIM = (() => {
             '<button class="aijs-option-btn" data-idx="' + i + '">' + escHTML(opt) + '</button>'
         ).join('');
 
+        // Phase 2: image block + choukai badge
+        const imgBlock     = _renderImageBlock(q);
+        const choukaiBadge = _renderChoukaiBadge(q);
+
         body.innerHTML =
+            choukaiBadge +
+            (imgBlock ? '<div class="aijs-q-visual">' + imgBlock + '</div>' : '') +
             '<div class="aijs-q-card"><div class="aijs-q-text">' + escHTML(q.question) + '</div></div>' +
             '<div class="aijs-option-list" id="aijs-option-list">' + optionsHtml + '</div>' +
             '<div id="aijs-feedback-slot"></div>';
@@ -549,6 +670,7 @@ const AI_JFT_SIM = (() => {
         document.querySelectorAll('#aijs-option-list .aijs-option-btn').forEach(btn => {
             btn.addEventListener('click', () => _selectOption(parseInt(btn.dataset.idx, 10)));
         });
+        _bindImageFallbacks(body); // Phase 2: img onerror fallback
     }
 
     function _selectOption(optionIndex) {
@@ -590,9 +712,11 @@ const AI_JFT_SIM = (() => {
         _renderCurrentQuestion();
     }
 
-    async function _finishSession() {
+    async function _finishSession(timeUp) {
         const s = _activeSession;
         if (!s) return;
+        _clearTimer();
+        const durationSeconds = _getElapsedSeconds();
 
         const sectionScores = {};
         SECTION_ORDER.forEach(sec => { sectionScores[sec] = { correct: 0, total: 0 }; });
@@ -618,7 +742,10 @@ const AI_JFT_SIM = (() => {
         try {
             const ref = _sessionsRef();
             if (ref) {
-                await ref.doc(s.sessionId).set({ score: overallScore, completed: true, sectionScores }, { merge: true });
+                await ref.doc(s.sessionId).set({
+                        score: overallScore, completed: true, sectionScores,
+                        durationSeconds,  // Phase 2
+                    }, { merge: true });
             }
         } catch (e) {
             console.warn('[AI_JFT_SIM] Gagal menyimpan hasil sesi (non-fatal):', e.message);
@@ -670,7 +797,7 @@ const AI_JFT_SIM = (() => {
             if (!snap.exists) throw new Error('Sesi tidak ditemukan.');
             const data = snap.data();
 
-            _activeSession = _buildActiveSession(sessionId, data.level, data.mode, data.creditCost, data.questions || {}, []);
+            _activeSession = _buildActiveSession(sessionId, data.level, data.mode, data.creditCost, data.questions || {}, [], data.timerSeconds || 0);
             _sessionLoading = false;
             _renderCurrentQuestion();
         } catch (e) {
@@ -726,9 +853,17 @@ const AI_JFT_SIM = (() => {
                     ? '<div class="aijs-history-score">' + d.score + '%</div>'
                     : '<div class="aijs-history-score aijs-pending">Belum selesai</div>';
 
+                // Phase 2: durasi pengerjaan
+                const dur = (typeof d.durationSeconds === 'number')
+                    ? Math.floor(d.durationSeconds / 60) + 'm ' + (d.durationSeconds % 60) + 'd'
+                    : null;
+                const durHtml = dur
+                    ? '<span class="aijs-history-dur">⏱ ' + dur + '</span>'
+                    : '';
+
                 return '<div class="aijs-history-item">' +
                     '<div class="aijs-history-info">' +
-                    '<div class="aijs-history-meta">' + escHTML(levelLabel) + ' · ' + escHTML(modeLabel) + '</div>' +
+                    '<div class="aijs-history-meta">' + escHTML(levelLabel) + ' · ' + escHTML(modeLabel) + durHtml + '</div>' +
                     '<div class="aijs-history-date">' + date + '</div></div>' +
                     scoreHtml +
                     '<button class="aijs-history-retry" data-sid="' + d.id + '">🔄 Ulangi</button></div>';

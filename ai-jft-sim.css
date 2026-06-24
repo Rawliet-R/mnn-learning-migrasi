@@ -379,3 +379,107 @@
   flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 12px; color: var(--text-muted); font-size: 12.5px;
 }
+
+/* ══════════════════════════════════════════════════════
+   PHASE 2 — Timer, Image Framework, Choukai, History+
+   ══════════════════════════════════════════════════════ */
+
+/* Topbar right cluster */
+.aijs-session-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Timer display */
+.aijs-timer-display {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  background: var(--bg-card-hover);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 3px 9px;
+  min-width: 46px;
+  text-align: center;
+  letter-spacing: 0.5px;
+  transition: color .2s, background .2s, border-color .2s;
+}
+.aijs-timer-display.aijs-timer-warning {
+  color: #ff6b6b;
+  border-color: #ff6b6b55;
+  background: #ff6b6b15;
+  animation: aijs-timer-pulse 1s ease-in-out infinite;
+}
+@keyframes aijs-timer-pulse {
+  0%,100% { opacity: 1; }
+  50%      { opacity: .6; }
+}
+
+/* Image question visual block */
+.aijs-q-visual {
+  margin-bottom: 14px;
+}
+
+/* Image placeholder */
+.aijs-img-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--bg-card-hover);
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 12px;
+  padding: 28px 20px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+.aijs-img-placeholder-icon { font-size: 32px; }
+.aijs-img-placeholder-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.aijs-img-placeholder-hint { font-size: 11px; opacity: .6; }
+
+/* Actual image asset */
+.aijs-img-wrap { border-radius: 12px; overflow: hidden; }
+.aijs-img-asset {
+  width: 100%;
+  max-height: 300px;
+  object-fit: contain;
+  display: block;
+  border-radius: 12px;
+}
+
+/* Choukai badge */
+.aijs-choukai-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-card-hover);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+/* History duration chip */
+.aijs-history-dur {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-card-hover);
+  border-radius: 6px;
+  padding: 2px 7px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
