@@ -797,36 +797,43 @@ const AI_JFT_SIM = (() => {
     }
 
     function _renderTimerHero() {
-        // Timer hero: block di atas soal, update bersama _updateTimerDisplay
+        // Inject ke PARENT aijs-session-body agar tidak dihapus body.innerHTML
+        if (document.getElementById('aijs-timer-hero')) {
+            _syncTimerHero();
+            return;
+        }
         const body = document.getElementById('aijs-session-body');
         if (!body) return;
-        // Hanya inject sekali; jika sudah ada skip
-        if (document.getElementById('aijs-timer-hero')) return;
         const hero = document.createElement('div');
         hero.id = 'aijs-timer-hero';
         hero.className = 'aijs-timer-hero';
-        const s = _activeSession;
-        const totalSections = SECTION_ORDER.filter(sec => (s.sections[sec]||[]).length > 0).length;
-        const flat = s.flat[s.currentIndex] || {};
-        const secLabel = SECTION_LABELS[flat.section] || '—';
-        const secIndex = SECTION_ORDER.filter(sec => (s.sections[sec]||[]).length > 0)
-                                      .indexOf(flat.section) + 1;
         hero.innerHTML =
             '<div class="aijs-timer-hero-time" id="aijs-timer-hero-time">—</div>' +
             '<div class="aijs-timer-hero-label">WAKTU TERSISA</div>' +
-            '<div class="aijs-timer-hero-section">' + escHTML(secLabel) + '</div>' +
-            '<div class="aijs-timer-hero-pos">Section ' + secIndex + '/' + totalSections + '</div>';
-        body.insertBefore(hero, body.firstChild);
+            '<div class="aijs-timer-hero-section" id="aijs-timer-hero-section">—</div>' +
+            '<div class="aijs-timer-hero-pos" id="aijs-timer-hero-pos"></div>';
+        body.parentElement.insertBefore(hero, body);
         _syncTimerHero();
     }
 
     function _syncTimerHero() {
         const el = document.getElementById('aijs-timer-hero-time');
         if (!el) return;
-        const m = Math.floor(_timerRemaining / 60);
+        const m  = Math.floor(_timerRemaining / 60);
         const sc = _timerRemaining % 60;
         el.textContent = m + ':' + String(sc).padStart(2, '0');
         el.classList.toggle('aijs-timer-hero-warning', _timerRemaining <= 60);
+        // Update section label tiap soal
+        const s = _activeSession;
+        if (!s) return;
+        const flat = s.flat[s.currentIndex] || {};
+        const secLabel  = SECTION_LABELS[flat.section] || '—';
+        const activeSecs = SECTION_ORDER.filter(sec => (s.sections[sec]||[]).length > 0);
+        const secIndex  = activeSecs.indexOf(flat.section) + 1;
+        const secEl = document.getElementById('aijs-timer-hero-section');
+        const posEl = document.getElementById('aijs-timer-hero-pos');
+        if (secEl) secEl.textContent = secLabel;
+        if (posEl) posEl.textContent = secIndex > 0 ? 'Section ' + secIndex + '/' + activeSecs.length : '';
     }
 
     function _bindSessionTopbarOnce() {
@@ -878,12 +885,16 @@ const AI_JFT_SIM = (() => {
             '<button class="aijs-option-btn" data-idx="' + i + '">' + escHTML(opt) + '</button>'
         ).join('');
 
-        // Phase 2: image block + choukai badge
-        const imgBlock     = _renderImageBlock(q);
-        const choukaiBadge = _renderChoukaiBadge(q);
+        // Choukai: routing ke flow audio
+        if (section === 'choukai') {
+            body.innerHTML = '';
+            _renderChoukaiQuestion(body, q);
+            return;
+        }
+
+        const imgBlock = _renderImageBlock(q);
 
         body.innerHTML =
-            choukaiBadge +
             (imgBlock ? '<div class="aijs-q-visual">' + imgBlock + '</div>' : '') +
             '<div class="aijs-q-card"><div class="aijs-q-text">' + escHTML(q.question) + '</div></div>' +
             '<div class="aijs-option-list" id="aijs-option-list">' + optionsHtml + '</div>' +
@@ -892,35 +903,52 @@ const AI_JFT_SIM = (() => {
         document.querySelectorAll('#aijs-option-list .aijs-option-btn').forEach(btn => {
             btn.addEventListener('click', () => _selectOption(parseInt(btn.dataset.idx, 10)));
         });
-        _bindImageFallbacks(body); // Phase 2: img onerror fallback
+        _bindImageFallbacks(body);
     }
 
-    // ── CHOUKAI AUDIO FLOW ─────────────────────────────────────────
-    function _renderChoukaiQuestion(body, q) {
-        const warn = _TTS.warningHtml();
-        const hasAudio = !warn && Array.isArray(q.listeningScript) && q.listeningScript.length;
 
-        // Render question text + listening state (options hidden initially)
+    // ── CHOUKAI AUDIO FLOW ─────────────────────────────────────────────
+    function _renderChoukaiQuestion(body, q) {
+        const warn     = _TTS.warningHtml();
+        const hasAudio = !warn && Array.isArray(q.listeningScript) && q.listeningScript.length;
+        const maxPlay  = (typeof q.maxPlay === 'number' && q.maxPlay >= 1) ? q.maxPlay : 2;
+        const playLabel = maxPlay > 1 ? '(maks ' + maxPlay + 'x)' : '(1x)';
+
+        // Tampilkan pertanyaan + tombol play — options tersembunyi sampai audio selesai
         body.innerHTML =
             '<div class="aijs-choukai-wrap">' +
             warn +
-            '<div class="aijs-choukai-question-text">' + escHTML(q.question) + '</div>' +
+            '<div class="aijs-q-card"><div class="aijs-choukai-question-text">' + escHTML(q.question) + '</div></div>' +
             '<div class="aijs-choukai-player" id="aijs-choukai-player">' +
-            '<div class="aijs-choukai-spinner" id="aijs-choukai-spinner">' +
-            '<div class="aijs-tts-wave"><span></span><span></span><span></span><span></span><span></span></div>' +
-            '<div class="aijs-choukai-status" id="aijs-choukai-status">🎧 Sedang memutar audio...</div>' +
-            '</div>' +
+            (hasAudio
+                ? '<div class="aijs-choukai-play-area">' +
+                  '<button class="aijs-play-btn" id="aijs-play-btn">' +
+                  '<span class="aijs-play-icon">&#9654;</span> Putar Audio <span class="aijs-play-hint">' + escHTML(playLabel) + '</span>' +
+                  '</button>' +
+                  '<p class="aijs-choukai-hint">Tekan tombol, dengarkan, lalu pilih jawaban.</p>' +
+                  '</div>'
+                : '<p class="aijs-choukai-noscript">Suara bahasa Jepang tidak tersedia — teks dialog ditampilkan langsung.</p>') +
             '</div>' +
             '<div id="aijs-choukai-options-slot"></div>' +
             '<div id="aijs-feedback-slot"></div>' +
             '</div>';
 
         if (hasAudio) {
-            _TTS.speak(q.listeningScript, () => _revealChoukaiOptions(q));
+            let playCount = 0;
+            const playBtn = document.getElementById('aijs-play-btn');
+            if (!playBtn) return;
+            playBtn.addEventListener('click', function onClick() {
+                if (playCount >= maxPlay) return;
+                playBtn.disabled = true;
+                playBtn.innerHTML = '<span class="aijs-play-icon">&#9646;&#9646;</span> Sedang memutar...';
+                _TTS.speak(q.listeningScript, () => {
+                    playCount++;
+                    _revealChoukaiOptions(q, playCount, maxPlay);
+                });
+            });
         } else {
-            // Fallback: tampilkan teks dialog, langsung reveal options
             _showChoukaiScript(q);
-            _revealChoukaiOptions(q);
+            _revealChoukaiOptions(q, 1, 1);
         }
     }
 
@@ -936,50 +964,46 @@ const AI_JFT_SIM = (() => {
         player.innerHTML = '<div class="aijs-script-box">' + lines + '</div>';
     }
 
-    function _revealChoukaiOptions(q) {
-        const spinner = document.getElementById('aijs-choukai-spinner');
-        if (spinner) spinner.remove();
+    function _revealChoukaiOptions(q, playCount, maxPlay) {
+        // playCount: sudah berapa kali diputar, maxPlay: batas maksimum
+        playCount = playCount || 1;
+        maxPlay   = maxPlay   || 2;
 
-        // Show script after audio done
+        // Update area player: tampilkan script + tombol replay jika masih bisa
         const player = document.getElementById('aijs-choukai-player');
         if (player && Array.isArray(q.listeningScript)) {
             const lines = q.listeningScript.map(l => {
-                const icon = l.speaker === 'male' ? '👨' : '👩';
+                const icon = l.speaker === 'male' ? '&#128104;' : '&#128105;';
                 return '<div class="aijs-script-line aijs-script-' + escHTML(l.speaker || 'female') + '">' +
                        '<span class="aijs-script-icon">' + icon + '</span>' +
                        '<span class="aijs-script-text">' + escHTML(l.text || '') + '</span></div>';
             }).join('');
-            player.innerHTML = '<div class="aijs-script-box">' + lines + '</div>' +
-                (_TTS.ALLOW_REPLAY && _TTS._hasJpVoice() && Array.isArray(q.listeningScript) && (q.maxPlay || 2) > 1
-                    ? '<button class="aijs-replay-btn" id="aijs-replay-btn">🔁 Putar Ulang</button>'
-                    : '');
+
+            const canReplay = _TTS.ALLOW_REPLAY && _TTS._hasJpVoice() && playCount < maxPlay;
+            player.innerHTML =
+                '<div class="aijs-script-box">' + lines + '</div>' +
+                (canReplay
+                    ? '<button class="aijs-replay-btn" id="aijs-replay-btn">' +
+                      '&#9654; Putar Ulang <span class="aijs-play-hint">(' + playCount + '/' + maxPlay + 'x)</span>' +
+                      '</button>'
+                    : (playCount >= maxPlay
+                        ? '<p class="aijs-replay-done">&#128263; Batas putar tercapai (' + maxPlay + 'x).</p>'
+                        : ''));
+
             const replayBtn = document.getElementById('aijs-replay-btn');
             if (replayBtn) {
-                // maxPlay: 1 = sekali saja, 2 = boleh ulang (default JFT: 2)
-                const maxPlay  = (typeof q.maxPlay === 'number') ? q.maxPlay : 2;
-                let   playCount = 1; // sudah diputar sekali otomatis
-                const updateReplayBtn = () => {
-                    if (playCount >= maxPlay) {
-                        replayBtn.disabled = true;
-                        replayBtn.textContent = '🔇 Batas putar tercapai';
-                    }
-                };
                 replayBtn.addEventListener('click', () => {
-                    if (playCount >= maxPlay) return;
                     replayBtn.disabled = true;
-                    replayBtn.textContent = '⏸ Memutar...';
+                    replayBtn.innerHTML = '&#9646;&#9646; Memutar...';
                     _TTS.speak(q.listeningScript, () => {
-                        playCount++;
-                        replayBtn.disabled = false;
-                        replayBtn.textContent = '🔁 Putar Ulang (' + playCount + '/' + maxPlay + ')';
-                        updateReplayBtn();
+                        const newCount = playCount + 1;
+                        _revealChoukaiOptions(q, newCount, maxPlay);
                     });
                 });
-                replayBtn.textContent = '🔁 Putar Ulang (1/' + maxPlay + ')';
-                updateReplayBtn();
             }
         }
 
+        // Tampilkan pilihan jawaban
         const slot = document.getElementById('aijs-choukai-options-slot');
         if (!slot) return;
         const optionsHtml = q.options.map((opt, i) =>
@@ -990,7 +1014,6 @@ const AI_JFT_SIM = (() => {
             btn.addEventListener('click', () => _selectOption(parseInt(btn.dataset.idx, 10)));
         });
     }
-
     function _selectOption(optionIndex) {
         const s = _activeSession;
         if (!s || s.answered) return;

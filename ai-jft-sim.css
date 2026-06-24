@@ -677,3 +677,118 @@
   font-size: 11px;
   color: var(--text-secondary);
 }
+
+/* ══════════════════════════════════════════════════════
+   V3 FIX — Timer hero di luar body (persistent)
+   ══════════════════════════════════════════════════════ */
+
+/* Timer hero: sudah di-inject ke parent page, bukan di dalam body scroll */
+#aijs-timer-hero.aijs-timer-hero {
+  margin: 0 16px 0;         /* sejajar padding halaman */
+  border-radius: 0 0 14px 14px;
+  border-top: none;
+  padding: 10px 20px 14px;
+}
+
+/* ══════════════════════════════════════════════════════
+   V3 FIX — Choukai play button
+   ══════════════════════════════════════════════════════ */
+
+.aijs-choukai-play-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 16px 10px;
+}
+
+.aijs-play-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--accent, #4f8ef7);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 28px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .18s, transform .1s, opacity .2s;
+  min-width: 180px;
+  justify-content: center;
+  letter-spacing: 0.3px;
+}
+
+.aijs-play-btn:hover:not(:disabled) {
+  background: var(--accent-hover, #3a79e6);
+  transform: translateY(-1px);
+}
+
+.aijs-play-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.aijs-play-btn:disabled {
+  opacity: .65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.aijs-play-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.aijs-play-hint {
+  font-size: 11px;
+  font-weight: 500;
+  opacity: .75;
+}
+
+.aijs-choukai-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 0;
+}
+
+.aijs-choukai-noscript {
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
+  padding: 12px 0;
+}
+
+.aijs-replay-done {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 8px 0 0;
+}
+
+/* Replay button (muncul setelah script ditampilkan) */
+.aijs-replay-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  margin-top: 10px;
+  transition: background .15s;
+}
+
+.aijs-replay-btn:hover:not(:disabled) {
+  background: var(--bg-card-hover);
+}
+
+.aijs-replay-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
