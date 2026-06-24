@@ -39,7 +39,7 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  const { messages, model = 'google/gemini-2.0-flash-001' } = payload || {};
+  const { messages, model = 'google/gemini-2.0-flash-001', max_tokens = 900 } = payload || {};
   if (!messages || !Array.isArray(messages)) {
     res.status(400).json({ error: 'Field "messages" diperlukan.' });
     return;
@@ -59,7 +59,11 @@ module.exports = async function handler(req, res) {
         'HTTP-Referer': referer,
         'X-Title': 'MNN Learning - AI Sensei',
       },
-      body: JSON.stringify({ model, max_tokens: 900, messages }),
+      // max_tokens defaultnya 900 (perilaku AI Sensei TIDAK berubah —
+      // AI Sensei tidak pernah mengirim field ini). Field ini ditambahkan
+      // agar fitur lain (mis. 🤖 AI JFT Simulation) bisa minta output JSON
+      // yang lebih panjang tanpa menyentuh AI Sensei sama sekali.
+      body: JSON.stringify({ model, max_tokens, messages }),
     });
 
     const data = await orRes.json();

@@ -36,7 +36,7 @@ exports.handler = async function (event) {
     };
   }
 
-  const { messages, model = 'google/gemini-2.0-flash-001' } = payload;
+  const { messages, model = 'google/gemini-2.0-flash-001', max_tokens = 900 } = payload;
   if (!messages || !Array.isArray(messages)) {
     return {
       statusCode: 400,
@@ -55,7 +55,10 @@ exports.handler = async function (event) {
         'HTTP-Referer': event.headers.referer || (event.headers.host ? `https://${event.headers.host}` : 'https://mnn-learning.app'),
         'X-Title': 'MNN Learning – AI Sensei',
       },
-      body: JSON.stringify({ model, max_tokens: 900, messages }),
+      // max_tokens defaultnya 900 (perilaku AI Sensei TIDAK berubah —
+      // AI Sensei tidak pernah mengirim field ini). Lihat catatan yang sama
+      // di api/ai-proxy.js (versi Vercel).
+      body: JSON.stringify({ model, max_tokens, messages }),
     });
 
     const data = await orRes.json();

@@ -1,9 +1,8 @@
 /**
  * Project   : MNN Learning — みんなの日本語
  * Brand     : Rawliet.ID / FrameProject
- * SW Version: v7  (feat: SWR for JS/CSS, Cache-First for images,
- *                        offline.html fallback, helper refactor)
- * Cache     : minna-v23
+ * SW Version: v8  (feat: tambah AI JFT Simulation ke pre-cache list)
+ * Cache     : minna-v24
  *
  * Caching strategy matrix:
  *   HTML / navigation  → Network First  + offline.html fallback
@@ -16,7 +15,7 @@
 // ═══════════════════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════════════════
-const CACHE       = 'minna-v23';
+const CACHE       = 'minna-v24';
 const OFFLINE_URL = './offline.html';
 
 const LOCAL_ASSETS = [
@@ -45,6 +44,10 @@ const LOCAL_ASSETS = [
   './jft_simulation/exam_files/SSWPM_mnn_jft_data[inoyamanaka495@gmail.com][20260613]_v10_expression.json',
   './jft_simulation/exam_files/SSWPM_mnn_jft_data[inoyamanaka495@gmail.com][20260613]_v10_choukai.json',
   './jft_simulation/exam_files/SSWPM_mnn_jft_data[inoyamanaka495@gmail.com][20260613]_v10_dokkai.json',
+  // 🤖 AI JFT Simulation (Phase 1)
+  './ai-jft-sim.css',
+  './ai-jft-sim-flag.js',
+  './ai-jft-sim.js',
 ];
 
 // CDN origins that get Cache-First treatment

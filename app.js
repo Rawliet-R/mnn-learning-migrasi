@@ -6082,7 +6082,9 @@ function initKotobaPage() {
 
 function navigateTo(page) {
     // ── ACCESS CONTROL: Simulasi Ujian is premium-only ──
-    if (page === 'simulasi' || page === 'jft-exam') {
+    // (mencakup juga sub-halaman AI JFT Simulation, karena fitur ini
+    //  bersarang di bawah hub Simulasi Ujian yang sudah premium-only)
+    if (page === 'simulasi' || page === 'jft-exam' || page === 'ai-jft-setup' || page === 'ai-jft-session') {
         if (!isPremiumUser()) { showPremiumModal(); return; }
     }
     STATE.currentPage = page;
@@ -6183,6 +6185,45 @@ function navigateTo(page) {
     // ── v2.7: Simulasi Ujian (JFT Basic Full Simulation) ──
     if (page === 'jft-exam') {
         if (typeof initJFTExamPage === 'function') initJFTExamPage();
+    }
+    // ── Simulasi Ujian (hub) — refresh visibility card AI JFT Simulation
+    //    setiap kali halaman dibuka, supaya toggle flag di Firestore Console
+    //    langsung terasa tanpa perlu update aplikasi.
+    if (page === 'simulasi') {
+        if (window.AI_JFT_FLAG) AI_JFT_FLAG.updateCardVisibility();
+    }
+    // ── 🤖 AI JFT Simulation — setup page (feature flag gate, sama pola dengan AI Sensei) ──
+    if (page === 'ai-jft-setup') {
+        if (window.AI_JFT_FLAG) {
+            AI_JFT_FLAG.checkAccess().then(result => {
+                if (!result.allowed) {
+                    STATE.currentPage = 'simulasi';
+                    document.querySelectorAll('.page').forEach(p => {
+                        p.classList.toggle('active', p.id === 'page-simulasi');
+                    });
+                    document.querySelectorAll('.nav-item').forEach(n => {
+                        n.classList.toggle('active', n.dataset.page === 'simulasi');
+                    });
+                    AI_JFT_FLAG.showBlockedToast(result.reason);
+                    return;
+                }
+                requestAnimationFrame(() => {
+                    if (window.AI_JFT_SIM) AI_JFT_SIM.renderSetupPage();
+                });
+            });
+        } else {
+            requestAnimationFrame(() => {
+                if (window.AI_JFT_SIM) AI_JFT_SIM.renderSetupPage();
+            });
+        }
+        return; // early return — nav active dihandle async di atas atau oleh checkAccess
+    }
+    // ── 🤖 AI JFT Simulation — session page (practice flow) ──
+    if (page === 'ai-jft-session') {
+        requestAnimationFrame(() => {
+            if (window.AI_JFT_SIM) AI_JFT_SIM.renderSessionPage();
+        });
+        return;
     }
 }
 

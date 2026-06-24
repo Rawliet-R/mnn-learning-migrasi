@@ -59,6 +59,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Noto+Sans+JP:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="ai-sensei.css" />
+  <link rel="stylesheet" href="ai-jft-sim.css" />
 </head>
 <body>
 
@@ -1034,6 +1035,76 @@
         <p class="exam-sim-card-hint">Jawab semua soal secara berurutan per section. Section Choukai 🎧 tidak bisa diulang — sesuai ujian asli.</p>
         <button class="exam-sim-btn" onclick="startJFTSimulation()">Mulai Simulasi →</button>
       </div>
+
+      <!-- ────── AI JFT Simulation (baru — modular, terpisah dari JFT Basic Full Simulation) ────── -->
+      <div class="aijs-card" id="aijs-entry-card" style="display:none">
+        <div class="aijs-card-header">
+          <div class="aijs-card-icon">🤖</div>
+          <div class="aijs-card-heading">
+            <div class="aijs-card-title">AI JFT Simulation</div>
+            <div class="aijs-card-sub">Latihan JFT tanpa batas dengan AI Sensei</div>
+          </div>
+          <span class="aijs-card-badge">Beta</span>
+        </div>
+        <p class="aijs-card-hint">Soal dibuat otomatis oleh AI dan berbeda setiap sesi. Pilih level &amp; mode, lalu mulai.</p>
+        <button class="aijs-btn" onclick="navigateTo('ai-jft-setup')">Atur Simulasi →</button>
+      </div>
+    </section>
+
+    <!-- ────── PAGE: AI JFT SIMULATION — SETUP (pilih level/mode + riwayat) ────── -->
+    <section class="page" id="page-ai-jft-setup">
+      <div>
+        <button class="aijs-back-link" onclick="navigateTo('simulasi')">← Simulasi Ujian</button>
+        <h2 class="aijs-page-title">🤖 AI JFT Simulation</h2>
+        <p class="aijs-page-sub">Latihan JFT tanpa batas — soal baru dibuat AI setiap sesi.</p>
+      </div>
+
+      <div class="aijs-setup-card">
+        <div class="aijs-setup-label">Pilih Level</div>
+        <div class="aijs-level-grid" id="aijs-level-grid">
+          <button class="aijs-level-btn" data-level="n5">N5</button>
+          <button class="aijs-level-btn" data-level="n4">N4</button>
+          <button class="aijs-level-btn" data-level="jft_basic">JFT Basic</button>
+          <button class="aijs-level-btn" data-level="ssw">SSW</button>
+        </div>
+
+        <div class="aijs-setup-label" style="margin-top:18px">Pilih Mode</div>
+        <div class="aijs-mode-list" id="aijs-mode-list">
+          <button class="aijs-mode-btn" data-mode="easy">
+            <div><div class="aijs-mode-name">Easy</div><div class="aijs-mode-detail">10 soal</div></div>
+            <span class="aijs-mode-cost">5 credit</span>
+          </button>
+          <button class="aijs-mode-btn" data-mode="normal">
+            <div><div class="aijs-mode-name">Normal</div><div class="aijs-mode-detail">20 soal</div></div>
+            <span class="aijs-mode-cost">10 credit</span>
+          </button>
+          <button class="aijs-mode-btn" data-mode="full">
+            <div><div class="aijs-mode-name">Full</div><div class="aijs-mode-detail">40 soal</div></div>
+            <span class="aijs-mode-cost">20 credit</span>
+          </button>
+        </div>
+
+        <div class="aijs-credit-info" id="aijs-start-credit-info">Pilih level dan mode untuk memulai.</div>
+        <button class="aijs-btn" id="aijs-start-btn" disabled>Mulai Simulasi →</button>
+      </div>
+
+      <div class="aijs-history-card">
+        <div class="aijs-section-title">📚 Riwayat Simulasi AI</div>
+        <div id="aijs-history-list"><div class="aijs-history-empty">Memuat riwayat...</div></div>
+      </div>
+    </section>
+
+    <!-- ────── PAGE: AI JFT SIMULATION — SESSION (practice flow, full-screen) ────── -->
+    <section class="page" id="page-ai-jft-session">
+      <div class="aijs-session-topbar">
+        <button class="aijs-session-back" id="aijs-session-exit-btn" aria-label="Keluar">✕</button>
+        <div class="aijs-session-progress-wrap">
+          <div class="aijs-session-section-label" id="aijs-session-section-label">—</div>
+          <div class="aijs-session-progress-track"><div class="aijs-session-progress-fill" id="aijs-session-progress-fill" style="width:0%"></div></div>
+        </div>
+        <div class="aijs-session-counter" id="aijs-session-counter">0/0</div>
+      </div>
+      <div class="aijs-session-body" id="aijs-session-body"><!-- AI_JFT_SIM merender di sini --></div>
     </section>
 
     <!-- ────── PAGE: JFT BASIC FULL SIMULATION (embedded engine) ────── -->
@@ -1279,6 +1350,10 @@
 <script src="ai-sensei.js"></script>
 <!-- ══ AI Credit Page ══ -->
 <script src="ai-sensei-credit.js"></script>
+
+<!-- ══ AI JFT Simulation — modular, terpisah dari AI Sensei (Phase 1) ══ -->
+<script src="ai-jft-sim-flag.js"></script>
+<script src="ai-jft-sim.js"></script>
 
 </body>
 </html>
