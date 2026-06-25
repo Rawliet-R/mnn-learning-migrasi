@@ -645,6 +645,9 @@ const AI_JFT_SIM = (() => {
             const _rawPayload = JSON.stringify({
                 model: MODEL,
                 max_tokens: cfg.maxTokens,
+                temperature: 0.7,
+                // JSON mode: paksa gpt-4o-mini output valid JSON selalu
+                response_format: { type: 'json_object' },
                 messages: [
                     { role: 'system', content: prompt.system },
                     { role: 'user',   content: prompt.user },
@@ -675,8 +678,11 @@ const AI_JFT_SIM = (() => {
             const raw = data?.choices?.[0]?.message?.content;
             if (!raw) throw new Error('Respon AI kosong. Coba lagi.');
 
-            // Debug log — tampilkan 400 karakter pertama respons AI di console
-            console.debug('[AI_JFT_SIM] raw AI response (first 400):', (raw || '').slice(0, 400));
+            // Debug log — tampilkan awal dan akhir respons AI
+            const _rawLen = (raw || '').length;
+            console.debug('[AI_JFT_SIM] raw AI response — length:', _rawLen,
+                '\nFirst 300:', (raw || '').slice(0, 300),
+                '\nLast 100:', (raw || '').slice(-100));
 
             const sections = _parseAndValidate(raw);
             if (!sections) {
