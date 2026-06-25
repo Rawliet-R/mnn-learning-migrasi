@@ -439,83 +439,75 @@ const AI_JFT_SIM = (() => {
 
             '== KANJI & KOTOBA: 4 TIPE WAJIB MERATA ==\n' +
 
-            'TIPE 1 Word Meaning: deskripsi situasi → pilih kata yang tepat.\n' +
-            '  Contoh A1: Q="あさ おきて かおを あらいます。どこで しますか。" Opts=["おふろ","トイレ","だいどころ","しんしつ"] A="おふろ"\n' +
-            '  Contoh A2: Q="工場で 機械の 電源を 切る ことです。なんと いいますか。" Opts=["停止","操作","点検","修理"] A="停止"\n\n' +
+            'TIPE 1 Word Meaning: deskripsi situasi singkat \u2192 pilih kata.\n' +
+            '  Contoh A1: Q="\u3042\u3055 \u304a\u304d\u3066 \u304b\u304a\u3092 \u3042\u3089\u3044\u307e\u3059\u3002 \u3069\u3053\u3067 \u3057\u307e\u3059\u304b\u3002" Opts=["\u304a\u3075\u308d","\u30c8\u30a4\u30ec","\u3060\u3044\u3069\u3053\u308d","\u3057\u3093\u3057\u3064"] A="\u304a\u3075\u308d"\n\n' +
 
-            'TIPE 2 Word Usage: kalimat dengan (　) → pilih kata pengisi blank.\\n' +
-            '  !!! KRITIS GRAMMAR: bentuk options HARUS sesuai dengan slot blank !!!\\n' +
-            '  • Jika blank diikuti ます → options = verb STEM (おき/ね/あらい/いき), BUKAN kamus (おきる/ねる)\\n' +
-            '  • Jika blank diikuti て/で → options = te-form (して/行って/来て), BUKAN kamus\\n' +
-            '  • Jika blank di akhir kalimat → options = bentuk kamus/lengkap\\n' +
-            '  • Jika blank diisi adjektif → options = adjektif sesuai posisi (sebelum です/noun)\\n' +
-            '  CONTOH SALAH (DILARANG): Q="毎月5時に（　）ます。" Opts=["おきる","ねる"] → jadi おきるます = SALAH!\\n' +
-            '  CONTOH BENAR: Q="毎日 6時に（　）ます。" Opts=["おき","ね","あらい","いき"] A="おき" → おきます = BENAR\\n' +
-            '  Contoh A1 adj: Q="このりんごは (　) です。あまくて おいしいです。" Opts=["やすい","たかい","あまい","からい"] A="あまい"\\n' +
-            '  Contoh A2 te-form: Q="日本の 生活に (　) きました。" Opts=["なれて","ふえて","すすんで","もどって"] A="なれて"\\n' +
-            '  • Jika blank diikuti をします → options = NOMINA (名詞), BUKAN verb\\n' +
-            '    Contoh: Q="公園で（　）をします。" Opts=["散歩","運動","ジョギング","ピクニック"] A="散歩" — BUKAN 遊んで/あそぶ\\n\\n' +
+            'TIPE 2 Word Usage: kalimat dengan (\u3000) \u2192 pilih kata pengisi blank.\n' +
+            '  GRAMMAR KRITIS:\n' +
+            '  \u2022 blank + \u307e\u3059 \u2192 options = stem verb (\u304a\u304d/\u306d/\u3042\u3089\u3044)\n' +
+            '  \u2022 blank + \u3066\u304d\u307e\u3057\u305f \u2192 options = te-form (\u306a\u308c\u3066/\u3075\u3048\u3066)\n' +
+            '  \u2022 blank + \u3092\u3057\u307e\u3059 \u2192 options = NOMINA (\u6563\u6b69/\u904b\u52d5), BUKAN verb\n' +
+            '  \u2022 blank + \u3067\u3059 \u2192 options = adjektif (\u304a\u304d\u3044/\u3084\u3059\u3044)\n' +
+            '  Contoh BENAR stem: Q="\u6bce\u65e5 6\u6642\u306b (\u3000) \u307e\u3059\u3002" Opts=["\u304a\u304d","\u306d","\u3042\u3089\u3044","\u3044\u304d"] A="\u304a\u304d"\n' +
+            '  Contoh BENAR nomina: Q="\u516c\u5712\u3067 (\u3000) \u3092\u3057\u307e\u3059\u3002" Opts=["\u6563\u6b69","\u904b\u52d5","\u30b8\u30e7\u30ae\u30f3\u30b0","\u30d4\u30af\u30cb\u30c3\u30af"] A="\u6563\u6b69"\n\n' +
 
-            'TIPE 3 Kanji Reading: kalimat dengan 【漢字】 → pilih CARA BACA kata 【itu】.\n' +
-            '  !!! KRITIS: options = 4 CARA BACA BERBEDA dari kata 【YANG SAMA】, BUKAN kata lain !!!\n' +
-            '  !!! DILARANG: 【新聞】 → options 紙/見る/聴く. WAJIB: 【新聞】 → options しんぶん/しんもん/じんぶん/しんぽん !!!\n' +
-            '  Contoh A1: Q="えきの まえに 【電話】 ボックスが あります。" Opts=["でんわ","てんわ","でいわ","とんわ"] A="でんわ"\n' +
-            '  Contoh A2: Q="【連絡】 して ください。" Opts=["れんらく","れいらく","れんろく","れんがく"] A="れんらく"\n' +
-            '  WAJIB: semua 4 opsi = hiragana saja. Tidak ada kanji di options TIPE 3.\n\n' +
+            'TIPE 3 Kanji Reading: kalimat dengan [\u6f22\u5b57] \u2192 pilih CARA BACA kata itu (hiragana).\n' +
+            '  !!! options = 4 cara baca BERBEDA dari kata YANG SAMA, BUKAN kata lain !!!\n' +
+            '  Contoh: Q="\u3048\u304d\u306e \u307e\u3048\u306b [\u96fb\u8a71] \u30dc\u30c3\u30af\u30b9\u304c \u3042\u308a\u307e\u3059\u3002" Opts=["\u3067\u3093\u308f","\u3066\u3093\u308f","\u3067\u3044\u308f","\u3068\u3093\u308f"] A="\u3067\u3093\u308f"\n\n' +
 
-            'TIPE 4 Kanji Meaning: kalimat dengan (　) → pilih kata kanji yang tepat.\n' +
-            '  Contoh A2: Q="東京タワーが 夜 あかるく (　) いて きれいでした。" Opts=["乗って","光って","通って","走って"] A="光って"\n\n' +
+            'TIPE 4 Kanji Meaning: kalimat dengan (\u3000) \u2192 pilih kata kanji.\n' +
+            '  Contoh: Q="\u6771\u4eac\u30bf\u30ef\u30fc\u304c \u591c \u3042\u304b\u308b\u304f (\u3000) \u3044\u3066 \u304d\u308c\u3044\u3067\u3057\u305f\u3002" Opts=["\u4e57\u3063\u3066","\u5149\u3063\u3066","\u901a\u3063\u3066","\u8d70\u3063\u3066"] A="\u5149\u3063\u3066"\n\n' +
 
-            'ANTI-BUG KANJI_KOTOBA:\n' +
-            '  [X] FATAL: TIPE 3 options bukan hiragana cara baca kata 【itu】\n' +
-            '  [X] FATAL: kata dalam 【】 bocor di options sebagai kanji\n' +
-            '  [X] options tanpa kalimat konteks (flashcard)\n' +
-            '  [OK] distractor = kata BERBEDA, kategori serupa\n\n' +
+            'ANTI-BUG KANJI: [X] options tidak sesuai slot blank | [X] jawaban bocor di soal | [X] flashcard tanpa kalimat\n\n' +
 
             '== EXPRESSION ==\n' +
-            'GRAMMAR sub-tipe: dialog dengan blank [　　] → pilih bentuk grammar.\n' +
-            '  Contoh: Q="Mei: 赤ちゃんに 何を [　　] と 思いますか。" Opts=["あげない","あげよう","あげるため","あげるつもり"] A="あげよう"\n' +
-            'EXPRESSION sub-tipe: dialog/situasi → pilih ungkapan paling tepat.\n' +
-            '  Contoh: Q="店員：ありがとうございました。\\n客：(　　　)" Opts=["こちらこそ","またこんど","おじゃまします","ごめんください"] A="こちらこそ"\n' +
-            '  [X] options bukan terjemahan Indonesia. Semua ungkapan Jepang natural.\n\n' +
+            '!!! ATURAN WAJIB PERAN DIALOG !!!\n' +
+            '  \u2022 \u3044\u3089\u3063\u3057\u3083\u3044\u307e\u305b = SELALU diucapkan \u5e97\u54e1 kepada \u5ba2, TIDAK PERNAH sebaliknya\n' +
+            '  \u2022 Jika \u5e97\u54e1 sudah berkata \u3044\u3089\u3063\u3057\u3083\u3044\u307e\u305b, \u5ba2 merespons (bukan \u5e97\u54e1 lagi)\n' +
+            '  \u2022 Jika A bertanya \u3053\u308c\u306f\u3044\u304f\u3089\u3067\u3059\u304b\uff1f, jawaban B HARUS harga (300\u5186\u3067\u3059, dll), BUKAN adjektif\n' +
+            '  \u2022 Jika A bertanya \u4f55\u6642\u3067\u3059\u304b\uff1f, jawaban B HARUS waktu (3\u6642\u3067\u3059, dll)\n' +
+            '  \u2022 Jika A bertanya \u3069\u3053\u3067\u3059\u304b\uff1f, jawaban B HARUS lokasi\n' +
+            '  [X] DILARANG: options yang tidak relevan konteks pertanyaan (adjektif untuk pertanyaan harga, dll)\n' +
+            '  Variasi: dialog toko | dialog kantor | dialog telepon | layanan publik\n' +
+            '  Format blank: (\u3000\u3000\u3000) BUKAN [\u3000\u3000]\n\n' +
 
-            '== CHOUKAI ==\\n' +
-            'WAJIB 3 field di setiap soal choukai:\\n' +
-            '  "listeningScript": [{"speaker":"male"|"female","text":"..."},...] — isi dialog/pengumuman\\n' +
-            '  "maxPlay": 1 atau 2\\n' +
-            '  "question": kalimat tanya singkat saja (BUKAN isi script)\\n' +
-            '!!! LARANGAN MUTLAK: JANGAN taruh isi dialog di field "question" !!!\\n' +
-            '!!! LARANGAN MUTLAK: JANGAN gunakan \\\\n di field "question" choukai !!!\\n' +
-            'SALAH: question="A: 明日は？\\\\nB: 映画を見ます。\\\\n\\\\nAさんは明日何をしますか？"\\n' +
-            'BENAR: listeningScript=[{speaker:"male",text:"明日は何をしますか？"},{speaker:"female",text:"家で映画を見ます。"}], question="Bさんは明日何をしますか？"\\n' +
-            'Script natural. Jawaban disimpulkan dari listeningScript saja.\\n' +
-            '3 tipe (variasikan): dialog 2 orang maxPlay:2 | percakapan toko maxPlay:2 | pengumuman 1 speaker maxPlay:1\\n\\n' +
+            '== CHOUKAI ==\n' +
+            '!!! ATURAN KONTEKS WAJIB !!!\n' +
+            '  \u2022 Jika question tanya JAM \u2192 listeningScript HARUS sebut jam spesifik\n' +
+            '  \u2022 Jika question tanya TEMPAT \u2192 listeningScript HARUS sebut tempat spesifik\n' +
+            '  \u2022 Jika question tanya HARGA \u2192 listeningScript HARUS sebut harga spesifik\n' +
+            '  \u2022 Jawaban HARUS bisa disimpulkan dari listeningScript saja\n' +
+            'WAJIB field: "listeningScript":[{speaker:"male"|"female",text:"..."},...], "maxPlay":1|2\n' +
+            '"question" = kalimat tanya singkat SAJA, BUKAN isi script\n' +
+            '[X] DILARANG: script tidak mengandung info yang ditanyakan\n' +
+            'Contoh BENAR: script="A:\u4eca\u65e5\u306e\u4f1a\u8b70\u306f\u4f55\u6642\u3067\u3059\u304b\uff1f B:10\u6642\u304b\u3089\u3067\u3059\u3002" question="\u4f1a\u8b70\u306f\u4f55\u6642\u304b\u3089\u3067\u3059\u304b\uff1f" \u2192 jawaban 10\u6642 ADA di script\n' +
+            'Contoh SALAH: script="\u4eca\u65e5\u306f\u4f1a\u8b70\u3092\u3057\u307e\u3059\u3002" question="\u4f1a\u8b70\u306f\u4f55\u6642\u304b\u3089\u3067\u3059\u304b\uff1f" \u2192 jam tidak ada di script = DILARANG\n\n' +
 
-            '== DOKKAI ==\\n' +
-            'WAJIB field: "docType" — nilai: surat|memo|chat|email|pengumuman|brosur|jadwal|label_obat|papan_info|daftar_harga\\n' +
-            'Format "question": teks bacaan + \\\\n\\\\n + kalimat tanya (gunakan \\\\n untuk newline dalam JSON string).\\n' +
-            '!!! KRITIS: teks bacaan HARUS mengandung SEMUA info untuk menjawab pertanyaan dengan PASTI. Tidak boleh ambigu !!!\\n' +
-            '!!! DILARANG: tabel tanpa konteks situasi spesifik — mis. tabel cuaca tanpa info hari ini cuaca apa !!!\\n' +
-            '2 tipe (variasikan):\\n' +
-            '(1) Teks naratif/chat — contoh BENAR:\\n' +
-            '    Q="フアン：山田さん、明日 会議は 何時からですか。\\\\n山田：10時からです。私は 9時半に 来て と 言われました。\\\\n\\\\nフアンさんは 何時に 来ますか。"\\n' +
-            '    Opts=["9時","9時半","10時","10時半"] A="9時半"\\n' +
-            '(2) Tabel/daftar — contoh BENAR (teks sudah mengandung jawaban pasti):\\n' +
-            '    Harga: Q="スーパーのチラシ\\\\n\\\\nりんご 100円\\\\nバナナ 150円\\\\nみかん 200円\\\\n\\\\nバナナは いくら ですか。" Opts=["100円","150円","200円","250円"] A="150円"\\n' +
-            '    Jadwal: Q="やまだ工場 今週のスケジュール\\\\n\\\\n月曜日 朝礼\\\\n火曜日 製品検査\\\\n水曜日 清掃\\\\n木曜日 出荷\\\\n\\\\n火曜日に 何が ありますか。" Opts=["朝礼","製品検査","清掃","出荷"] A="製品検査"\\n' +
-            '    Label obat: Q="タント錠\\\\n1日3回 食後 1回2つ\\\\n眠くなることがあります\\\\n\\\\nこの薬を 飲んだ あと 何が おきますか。" Opts=["眠くなる","頭が痛くなる","熱が出る","食欲がなくなる"] A="眠くなる"\\n' +
-            '    CONTOH SALAH (ambigu — DILARANG): Q="晴れ 28度\\\\n雨 22度\\\\n曇り 24度\\\\n\\\\n今日は 何度 ですか。" — teks tidak menyebutkan hari ini cuaca apa!\\n\\n' +
+            '== DOKKAI ==\n' +
+            '!!! ATURAN KONTEKS WAJIB !!!\n' +
+            '  \u2022 Teks bacaan HARUS memuat SEMUA fakta spesifik untuk menjawab pertanyaan\n' +
+            '  \u2022 Jika tanya HARGA \u2192 teks HARUS ada harga (100\u5186, 200\u5186, dll)\n' +
+            '  \u2022 Jika tanya JAM \u2192 teks HARUS ada jam spesifik\n' +
+            '  \u2022 Jika tanya TEMPAT \u2192 teks HARUS ada lokasi spesifik\n' +
+            '  \u2022 Teks bacaan minimal 3 kalimat atau 3 baris data\n' +
+            '  [X] DILARANG: tanya harga tapi teks tidak ada harga\n' +
+            '  [X] DILARANG: soal fill-in-blank tanpa teks bacaan (itu bukan dokkai!)\n' +
+            '  [X] DILARANG: tanya lokasi tapi teks tidak menyebut lokasi\n' +
+            'WAJIB field: "docType": surat|memo|chat|email|pengumuman|brosur|jadwal|label_obat|papan_info|daftar_harga\n' +
+            'Format question: [teks bacaan] + dua baris kosong + [kalimat tanya]\n' +
+            'Contoh BENAR daftar_harga:\n' +
+            '  Q="\u30b9\u30fc\u30d1\u30fc\u306e\u30c1\u30e9\u30b7\\n\\n\u308a\u3093\u3054 100\u5186\\n\u30d0\u30ca\u30ca 150\u5186\\n\u307f\u304b\u3093 200\u5186\\n\\n\u30d0\u30ca\u30ca\u306f\u3044\u304f\u3089\u3067\u3059\u304b\u3002" Opts=["100\u5186","150\u5186","200\u5186","250\u5186"] A="150\u5186"\n' +
+            'Contoh SALAH:\n' +
+            '  Q="\u3053\u306e\u5e97\u3067\u306f\u308a\u3093\u3054\u3001\u30d0\u30ca\u30ca\u3001\u30aa\u30ec\u30f3\u30b8\u304c\u58f2\u3063\u3066\u3044\u307e\u3059\u3002\u308a\u3093\u3054\u306f\u3044\u304f\u3089\u3067\u3059\u304b\u3002" \u2192 tidak ada harga = DILARANG\n\n' +
 
             '== LEVEL: ' + levelGuide + ' ==\n\n' +
 
-            '== QUALITY CHECK SEBELUM OUTPUT ==\n' +
-            '1. TIPE 3: semua 4 options = hiragana cara baca kata 【target】 (bukan kata lain).\n' +
-            '2. Tidak ada jawaban bocor verbatim di question.\n' +
-            '3. Hanya 1 jawaban benar.\n' +
-            '4. Choukai: listeningScript ada dan natural.\n' +
-            '5. Dokkai: gunakan \\n (bukan literal newline) dalam JSON string untuk baris baru.\n' +
-            '6. Level A1: JANGAN kanji di luar daftar yang diizinkan.';
-
+            '== QUALITY CHECK ==\n' +
+            '1. TIPE 3: options = 4 cara baca hiragana kata target, BUKAN kata lain\n' +
+            '2. Expression: peran dialog benar, jawaban sesuai jenis pertanyaan\n' +
+            '3. Choukai: listeningScript ada & memuat info yang ditanyakan\n' +
+            '4. Dokkai: teks bacaan ada & memuat semua fakta untuk menjawab\n' +
+            '5. Level A1: kanji terbatas sesuai whitelist';
         const user =
             'Buat paket ujian JFT-Basic level "' + levelLabel + '" dengan soal TEPAT:\n' +
             '  kanji_kotoba=' + s.kanji_kotoba + ' (tiap tipe merata), expression=' + s.expression +
