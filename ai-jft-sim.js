@@ -63,9 +63,9 @@ const AI_JFT_SIM = (() => {
     // DEFAULT yang bisa disesuaikan kapan saja — total soal & credit cost
     // mengikuti spesifikasi persis dari permintaan awal.
     const MODES = {
-        easy:   { label: 'Easy',   totalSoal: 10, credit: 5,  maxTokens: 2800, timerSeconds: 900,  sections: { kanji_kotoba: 3,  expression: 2,  dokkai: 3,  choukai: 2  } },
-        normal: { label: 'Normal', totalSoal: 20, credit: 10, maxTokens: 5200, timerSeconds: 1800, sections: { kanji_kotoba: 6,  expression: 5,  dokkai: 5,  choukai: 4  } },
-        full:   { label: 'Full',   totalSoal: 40, credit: 20, maxTokens: 9500, timerSeconds: 3600, sections: { kanji_kotoba: 12, expression: 10, dokkai: 10, choukai: 8  } },
+        easy:   { label: 'Easy',   totalSoal: 10, credit: 5,  maxTokens: 4000, timerSeconds: 900,  sections: { kanji_kotoba: 3,  expression: 2,  choukai: 2,  dokkai: 3  } },
+        normal: { label: 'Normal', totalSoal: 20, credit: 10, maxTokens: 7000, timerSeconds: 1800, sections: { kanji_kotoba: 6,  expression: 5,  choukai: 4,  dokkai: 5  } },
+        full:   { label: 'Full',   totalSoal: 40, credit: 20, maxTokens: 12000, timerSeconds: 3600, sections: { kanji_kotoba: 12, expression: 10, choukai: 8,  dokkai: 10 } },
     };
 
     const SECTION_ORDER  = ['kanji_kotoba', 'expression', 'choukai', 'dokkai'];
@@ -396,207 +396,118 @@ const AI_JFT_SIM = (() => {
         await _generateSession(_selectedLevel, _selectedMode, cfg);
     }
 
-    // ─────────────────────────────────────────────────────────────────
-    // LEVEL GUIDE  (sesuai CEFR / JFT-Basic resmi)
-    // ─────────────────────────────────────────────────────────────────
+    // ──────────────────────────────────────────────────────────────────
+    // LEVEL GUIDE
+    // ──────────────────────────────────────────────────────────────────
     function _levelGuide(levelId) {
         const g = {
-            a1: [
-                'Level A1 Pemula (CEFR A1):',
-                '- Hanya gunakan kosakata paling dasar: salam, angka, waktu, cuaca, makanan, keluarga, warna, benda sehari-hari.',
-                '- Kalimat SANGAT PENDEK (max 10 kata), dominan hiragana dan katakana.',
-                '- Kanji yang BOLEH muncul di soal/options: hanya 人・日・本・水・火・木・金・土・月・山・川・大・小・中・上・下・食・飲・見・行・来・帰・時・間・円・店・駅・学・校・先・生。',
-                '- JANGAN pakai kanji selain daftar di atas.',
-                '- Topik: konbini, makanan, harga, transportasi dasar, perkenalan.',
-            ].join(' '),
-            a1plus: [
-                'Level A1+ Dasar (CEFR A1+):',
-                '- Kosakata berkembang: benda di sekitar, pekerjaan dasar, instruksi pendek.',
-                '- Kalimat pendek dengan partikel dasar (は/が/を/に/で/の).',
-                '- Kanji yang BOLEH: tambah 友・達・話・読・書・聞・出・入・会・電・話・車・自・転・休・病・院・薬。',
-                '- Topik: belanja, transportasi, instruksi sederhana, jadwal harian.',
-            ].join(' '),
-            a2: [
-                'Level A2 Awal Kerja (CEFR A2 = JFT-Basic standard):',
-                '- Format soal mengikuti JFT-Basic resmi (Japan Foundation).',
-                '- Kosakata kerja: pabrik, kantor, konbini, stasiun, rumah sakit, sekolah.',
-                '- Kalimat panjang menengah, boleh ada kanji umum (200 kanji produktif).',
-                '- Topik: instruksi kerja, jadwal, peraturan, pengumuman, percakapan tempat kerja.',
-            ].join(' '),
-            a2plus: [
-                'Level A2+ Siap Kerja (CEFR A2+):',
-                '- Soal lebih kompleks: pengumuman resmi, formulir, instruksi multi-langkah.',
-                '- Percakapan bisnis sederhana, ungkapan hormat (敬語).',
-                '- Topik: safety kerja, laporan insiden, jadwal kompleks, email bisnis.',
-            ].join(' '),
-            n5:      'Level N5 (JLPT N5 dasar): setara A1, kosakata & tata bahasa paling dasar.',
-            n4:      'Level N4 (JLPT N4): setara A2, kosakata & tata bahasa menengah-dasar.',
-            jft_basic: 'Level JFT-Basic (setara CEFR A2): format resmi Japan Foundation, situasi kerja & kehidupan sehari-hari.',
+            a1: 'A1 Pemula (CEFR A1): kosakata SANGAT dasar. Kalimat max 10 kata. HANYA kanji: 人日本水火木金土月山川大小中上下食飲見行来帰時間円店駅学校先生。JANGAN kanji lain.',
+            a1plus: 'A1+ Dasar: kosakata dasar-menengah. Partikel は/が/を/に/で/の. Topik: belanja, transportasi, instruksi pendek.',
+            a2: 'A2 Awal Kerja (JFT-Basic standard): format resmi JFT. Kosakata kerja. Topik: kantor, pabrik, konbini, stasiun, rumah sakit.',
+            a2plus: 'A2+ Siap Kerja: soal kompleks. Pengumuman resmi, formulir, instruksi multi-langkah, ungkapan hormat.',
+            n5: 'N5 (setara A1): kosakata & tata bahasa paling dasar.', n4: 'N4 (setara A2): menengah-dasar.',
+            jft_basic: 'JFT-Basic (CEFR A2): format resmi Japan Foundation, situasi kerja & harian.',
         };
         return g[levelId] || g.a2;
     }
 
-    // ─────────────────────────────────────────────────────────────────
-    // BUILD PROMPT  (single-call architecture, audit total per spec)
-    // ─────────────────────────────────────────────────────────────────
+    // ──────────────────────────────────────────────────────────────────
+    // BUILD PROMPT  — single-call architecture
+    // ──────────────────────────────────────────────────────────────────
     function _buildPrompt(levelId, cfg) {
         const levelLabel = LEVELS[levelId] || levelId;
         const levelGuide = _levelGuide(levelId);
         const s = cfg.sections;
 
-        // ── SYSTEM PROMPT ────────────────────────────────────────────
         const system =
-            'Kamu adalah pembuat soal ujian JFT-Basic (Japan Foundation Test for Basic Japanese) ' +
-            'untuk aplikasi MNN Learning (Rawliet.ID). ' +
-            'Balas HANYA dengan satu objek JSON murni — TANPA teks lain, komentar, atau markdown fence.\\n\\n' +
+            'Kamu adalah pembuat soal ujian JFT-Basic untuk aplikasi MNN Learning. ' +
+            'Balas HANYA dengan JSON murni, tanpa teks lain, tanpa markdown fence.\n\n' +
 
-            '═══ KANJI & KOTOBA (Script and Vocabulary) ═══\\n' +
-            'Ada 4 tipe soal resmi JFT. WAJIB merata tiap tipe:\\n\\n' +
+            '== KANJI & KOTOBA: 4 TIPE WAJIB MERATA ==\n' +
 
-            'TIPE 1 — Word Meaning (語の意味):\\n' +
-            '  Deskripsi situasi pendek → pilih kata yang benar.\\n' +
-            '  Format "question": kalimat deskripsi TANPA blank/kurung, tanpa kata target.\\n' +
-            '  Format "options": 4 kata/frasa berbeda (hiragana atau campuran sesuai level).\\n' +
-            '  Contoh A1:\\n' +
-            '    question: "あさ おきて、かおを あらいます。どこで しますか。"\\n' +
-            '    options: ["おふろ","トイレ","だいどころ","しんしつ"], answer: "おふろ"\\n' +
-            '  Contoh A2:\\n' +
-            '    question: "工場で 機械の 電源を 切る ことです。なんと いいますか。"\\n' +
-            '    options: ["スイッチオフ","シャットダウン","停止","操作"], answer: "停止"\\n\\n' +
+            'TIPE 1 Word Meaning: deskripsi situasi → pilih kata yang tepat.\n' +
+            '  Contoh A1: Q="あさ おきて かおを あらいます。どこで しますか。" Opts=["おふろ","トイレ","だいどころ","しんしつ"] A="おふろ"\n' +
+            '  Contoh A2: Q="工場で 機械の 電源を 切る ことです。なんと いいますか。" Opts=["停止","操作","点検","修理"] A="停止"\n\n' +
 
-            'TIPE 2 — Word Usage (語の用法):\\n' +
-            '  Kalimat dengan blank （　） → pilih kata/frasa yang mengisi dengan tepat.\\n' +
-            '  Format "question": kalimat dengan （　）, semua hiragana/campuran sesuai level.\\n' +
-            '  Format "options": 4 kata/frasa berbeda yang bisa mengisi blank.\\n' +
-            '  KRITIS: jawaban benar harus jelas tepat secara makna DAN konteks.\\n' +
-            '  Contoh A1:\\n' +
-            '    question: "このりんごは （　） です。 あまくて おいしいです。"\\n' +
-            '    options: ["やすい","たかい","あまい","からい"], answer: "あまい"\\n' +
-            '  Contoh A2:\\n' +
-            '    question: "だんだん 日本の 生活に （　） きました。"\\n' +
-            '    options: ["なれて","ふえて","すすんで","もどって"], answer: "なれて"\\n\\n' +
+            'TIPE 2 Word Usage: kalimat dengan (　) → pilih kata pengisi blank.\n' +
+            '  Contoh A1: Q="このりんごは (　) です。あまくて おいしいです。" Opts=["やすい","たかい","あまい","からい"] A="あまい"\n' +
+            '  Contoh A2: Q="だんだん 日本の 生活に (　) きました。" Opts=["なれて","ふえて","すすんで","もどって"] A="なれて"\n\n' +
 
-            'TIPE 3 — Kanji Reading (漢字の読み方):\\n' +
-            '  Kalimat dengan SATU kata kanji dalam 【】 → pilih CARA BACA HIRAGANA kata itu.\\n' +
-            '  !!!KRITIS!!!: options HARUS 4 CARA BACA BERBEDA dari kata 【YANG SAMA】, BUKAN kata lain!\\n' +
-            '  Bedakan dengan fonem mirip: vokal panjang, dakuten, handakuten, dll.\\n' +
-            '  DILARANG: kata dalam 【】 bocor di options (jangan ketik ulang kanjinya).\\n' +
-            '  Contoh A1:\\n' +
-            '    question: "えきの まえに 【電話】 ボックスが あります。"\\n' +
-            '    options: ["でんわ","てんわ","でいわ","とんわ"], answer: "でんわ"\\n' +
-            '  Contoh A2:\\n' +
-            '    question: "水道が こわれた ときは ここに 【連絡】 して ください。"\\n' +
-            '    options: ["れんらく","れいらく","れんろく","れんがく"], answer: "れんらく"\\n' +
-            '  WAJIB: Semua 4 opsi = hiragana. Tidak ada kanji di options TIPE 3.\\n\\n' +
+            'TIPE 3 Kanji Reading: kalimat dengan 【漢字】 → pilih CARA BACA kata 【itu】.\n' +
+            '  !!! KRITIS: options = 4 CARA BACA BERBEDA dari kata 【YANG SAMA】, BUKAN kata lain !!!\n' +
+            '  !!! DILARANG: 【新聞】 → options 紙/見る/聴く. WAJIB: 【新聞】 → options しんぶん/しんもん/じんぶん/しんぽん !!!\n' +
+            '  Contoh A1: Q="えきの まえに 【電話】 ボックスが あります。" Opts=["でんわ","てんわ","でいわ","とんわ"] A="でんわ"\n' +
+            '  Contoh A2: Q="【連絡】 して ください。" Opts=["れんらく","れいらく","れんろく","れんがく"] A="れんらく"\n' +
+            '  WAJIB: semua 4 opsi = hiragana saja. Tidak ada kanji di options TIPE 3.\n\n' +
 
-            'TIPE 4 — Kanji Meaning and Usage (漢字の意味と用法):\\n' +
-            '  Kalimat dengan blank （　） → pilih kata KANJI yang paling tepat.\\n' +
-            '  Format "question": kalimat dengan （　）, boleh campuran kanji+hiragana.\\n' +
-            '  Format "options": 4 kata kanji (verb-te form, atau noun) yang serupa kategori.\\n' +
-            '  Contoh A2:\\n' +
-            '    question: "東京タワーが 夜 あかるく （　） いて、とても きれいでした。"\\n' +
-            '    options: ["乗って","光って","通って","走って"], answer: "光って"\\n' +
-            '  Contoh A1:\\n' +
-            '    question: "まいにち 6じに （　） ます。"\\n' +
-            '    options: ["起き","食べ","帰り","飲み"], answer: "起き"\\n\\n' +
+            'TIPE 4 Kanji Meaning: kalimat dengan (　) → pilih kata kanji yang tepat.\n' +
+            '  Contoh A2: Q="東京タワーが 夜 あかるく (　) いて きれいでした。" Opts=["乗って","光って","通って","走って"] A="光って"\n\n' +
 
-            'ANTI-BUG KANJI & KOTOBA:\\n' +
-            '  ✗ LARANGAN MUTLAK: jawaban bocor — jika 【新聞】 di question, options BUKAN 紙/雑誌/聴く/見る. Options = cara baca 新聞.\\n' +
-            '  ✗ LARANGAN: campur format options dalam satu soal (kanji+hiragana bercampur di TIPE 3).\\n' +
-            '  ✗ LARANGAN: options morfologi sama (食べる/食べた/食べます).\\n' +
-            '  ✗ LARANGAN: question tanpa konteks kalimat (flashcard "__ = ?" tanpa kalimat).\\n' +
-            '  ✓ WAJIB: distractor masuk akal, kategori sama, tapi jelas salah.\\n\\n' +
+            'ANTI-BUG KANJI_KOTOBA:\n' +
+            '  [X] FATAL: TIPE 3 options bukan hiragana cara baca kata 【itu】\n' +
+            '  [X] FATAL: kata dalam 【】 bocor di options sebagai kanji\n' +
+            '  [X] options tanpa kalimat konteks (flashcard)\n' +
+            '  [OK] distractor = kata BERBEDA, kategori serupa\n\n' +
 
-            '═══ EXPRESSION (Conversation and Expression) ═══\\n' +
-            'Dua sub-tipe — variasikan:\\n\\n' +
-            'SUB-TIPE GRAMMAR:\\n' +
-            '  Dialog antara 2 orang, satu giliran ada blank [　　　].\\n' +
-            '  Options: 4 variasi bentuk grammar (て形/た形/ます形/～つもり/～ため/dll).\\n' +
-            '  Contoh: Mei-san menanya Emi-san tentang hadiah. Giliran Mei blank.\\n' +
-            '    options: ["あげない","あげよう","あげるため","あげるつもり"], answer: "あげよう"\\n\\n' +
-            'SUB-TIPE EXPRESSION:\\n' +
-            '  Dialog/situasi → pilih ungkapan paling tepat untuk konteks tersebut.\\n' +
-            '  Options: 4 ungkapan bahasa Jepang natural (bukan terjemahan).\\n' +
-            '  Variasi setting: kantor, toko, stasiun, rumah sakit, sekolah, telepon.\\n' +
-            '  Contoh dialog kasir toko:\\n' +
-            '    question: "店員：ありがとうございました。\\n客：（　　　）"\\n' +
-            '    options: ["こちらこそ","またこんど","おじゃまします","ごめんください"], answer: "こちらこそ"\\n\\n' +
-            'ANTI-BUG EXPRESSION:\\n' +
-            '  ✗ Jangan options terjemahan Indonesia.\\n' +
-            '  ✗ Jangan soal grammar murni tanpa konteks dialog.\\n' +
-            '  ✓ Semua options = ungkapan Jepang natural yang bisa diucapkan nyata.\\n\\n' +
+            '== EXPRESSION ==\n' +
+            'GRAMMAR sub-tipe: dialog dengan blank [　　] → pilih bentuk grammar.\n' +
+            '  Contoh: Q="Mei: 赤ちゃんに 何を [　　] と 思いますか。" Opts=["あげない","あげよう","あげるため","あげるつもり"] A="あげよう"\n' +
+            'EXPRESSION sub-tipe: dialog/situasi → pilih ungkapan paling tepat.\n' +
+            '  Contoh: Q="店員：ありがとうございました。\\n客：(　　　)" Opts=["こちらこそ","またこんど","おじゃまします","ごめんください"] A="こちらこそ"\n' +
+            '  [X] options bukan terjemahan Indonesia. Semua ungkapan Jepang natural.\n\n' +
 
-            '═══ CHOUKAI (Listening Comprehension) ═══\\n' +
-            'Setiap soal WAJIB: "listeningScript": [{speaker:"male"|"female", text:"..."},...], "maxPlay": 1 atau 2.\\n' +
-            '"question" = pertanyaan yang dijawab SETELAH dengar audio (BUKAN kutipan dialog).\\n' +
-            'Script harus natural, seperti percakapan nyata, TIDAK robotik.\\n' +
-            'Jawaban HARUS bisa disimpulkan dari isi script saja.\\n\\n' +
-            '3 sub-tipe JFT (variasikan dalam satu paket):\\n' +
-            'SUB 1 — Conversation (percakapan 2 orang): maxPlay:2\\n' +
-            '  Topik: liburan, instruksi kerja, jadwal, kabar teman.\\n' +
-            '  Script: 3-6 giliran dialog male+female bergantian.\\n' +
-            'SUB 2 — Shop/Public Place (percakapan di toko/tempat umum): maxPlay:2\\n' +
-            '  Topik: tanya produk, pesan makanan, beli tiket, tanya arah.\\n' +
-            '  Script: 2-4 giliran, satu customer satu staff.\\n' +
-            'SUB 3 — Announcement/Instruction (pengumuman 1 orang): maxPlay:1\\n' +
-            '  Topik: pengumuman stasiun, instruksi safety pabrik, info toko.\\n' +
-            '  Script: 1 speaker, 2-5 kalimat jelas dan informatif.\\n\\n' +
+            '== CHOUKAI ==\n' +
+            'WAJIB field: "listeningScript":[{"speaker":"male"|"female","text":"..."},...], "maxPlay":1|2\n' +
+            '"question" = pertanyaan setelah dengar audio, BUKAN kutipan script.\n' +
+            'Script harus natural. Jawaban HARUS bisa disimpulkan dari script.\n' +
+            '3 tipe (variasikan): (1) dialog 2 orang maxPlay:2, (2) percakapan toko/tempat umum maxPlay:2, (3) pengumuman 1 orang maxPlay:1\n\n' +
 
-            '═══ DOKKAI (Reading Comprehension) ═══\\n' +
-            'Setiap soal WAJIB memiliki "docType".\\n' +
-            'Nilai docType: "surat"|"memo"|"chat"|"email"|"pengumuman"|"brosur"|"jadwal"|"label_obat"|"papan_info"|"daftar_harga"\\n\\n' +
-            '2 sub-tipe JFT (variasikan dalam satu paket):\\n' +
-            'SUB 1 — Comprehending Content (teks naratif/surat/chat):\\n' +
-            '  Teks 3-6 kalimat, lalu pertanyaan.\\n' +
-            '  Format "question": teks bacaan + baris kosong + pertanyaan.\\n' +
-            '  Contoh docType "chat":\\n' +
-            '    question: "フアン：山田さん、明日 会議は 何時からですか。\\n山田：10時からです。でも 私は 9時半に 来て ください と 言われました。\\n\\nフアンさんは 何時に 来なければ なりませんか。"\\n' +
-            '    options: ["9時","9時半","10時","10時半"], answer: "9時半"\\n\\n' +
-            'SUB 2 — Information Search (tabel/daftar/label):\\n' +
-            '  Format tabel TEKS (TANPA gambar), dibuat dari spasi/karakter.\\n' +
-            '  Teks harus bisa dibaca tanpa gambar.\\n' +
-            '  Contoh docType "daftar_harga":\\n' +
-            '    question: "スーパーのチラシ\\n\\nりんご　　100円\\nバナナ　　150円\\nみかん　　200円\\n\\nバナナは いくら ですか。"\\n' +
-            '    options: ["100円","150円","200円","250円"], answer: "150円"\\n' +
-            '  Contoh docType "jadwal":\\n' +
-            '    question: "やまだ工場 今週のスケジュール\\n\\n月曜日　朝礼・機械チェック\\n火曜日　製品検査\\n水曜日　清掃・メンテナンス\\n木曜日　製品出荷\\n金曜日　会議\\n\\n水曜日に 何が ありますか。"\\n' +
-            '    options: ["朝礼","製品検査","清掃","会議"], answer: "清掃"\\n' +
-            '  Contoh docType "label_obat":\\n' +
-            '    question: "たんぽぽ薬局\\n\\nセキドミカプセル　1日3回　食後　1回2つ\\nタントレン錠　　　1日2回　食前　1回1つ\\nネツナレ錠　　　　1日3回　食後　1回1つ（眠くなることがある）\\n\\nネツナレ錠を 飲んだ あと、何が おきるかも しれませんか。"\\n' +
-            '    options: ["おなかが いたくなる","ねむくなる","のどが かわく","あたまが いたくなる"], answer: "ねむくなる"\\n\\n' +
-            'ANTI-BUG DOKKAI:\\n' +
-            '  ✗ JANGAN tulis \\\\n sebagai karakter escape di JSON value — gunakan newline nyata.\\n' +
-            '  ✓ Teks bacaan harus CUKUP untuk menjawab pertanyaan.\\n' +
-            '  ✓ 1 soal dokkai = 1 teks bacaan + 1 pertanyaan (bukan 2 pertanyaan per teks).\\n\\n' +
+            '== DOKKAI ==\n' +
+            'WAJIB field: "docType" — nilai: surat|memo|chat|email|pengumuman|brosur|jadwal|label_obat|papan_info|daftar_harga\n' +
+            'Format "question": teks bacaan + baris kosong + kalimat tanya. Gunakan \\n untuk baris baru dalam JSON string.\n' +
+            '2 tipe (variasikan):\n' +
+            '(1) Teks naratif: Q="フアン：山田さん、明日 会議は 何時からですか。\\n山田：10時からです。私は 9時半に 来て と 言われました。\\n\\nフアンさんは 何時に 来ますか。" Opts=["9時","9時半","10時","10時半"] A="9時半"\n' +
+            '(2) Tabel teks (tanpa gambar): Q="スーパーのチラシ\\n\\nりんご 100円\\nバナナ 150円\\nみかん 200円\\n\\nバナナは いくら ですか。" Opts=["100円","150円","200円","250円"] A="150円"\n' +
+            'Contoh jadwal: Q="やまだ工場 今週\\n\\n月 朝礼・機械チェック\\n火 製品検査\\n水 清掃\\n木 出荷\\n金 会議\\n\\n水曜日に 何が ありますか。" Opts=["朝礼","製品検査","清掃","出荷"] A="清掃"\n\n' +
 
-            '═══ LEVEL CALIBRATION ═══\\n' + levelGuide + '\\n\\n' +
+            '== LEVEL: ' + levelGuide + ' ==\n\n' +
 
-            '═══ QUALITY CONTROL (CEK SEBELUM OUTPUT) ═══\\n' +
-            '1. Kanji & Kotoba TIPE 3: semua 4 options = cara baca hiragana berbeda dari kata 【target】 yang SAMA.\\n' +
-            '2. Tidak ada jawaban bocor di question (kata target tidak muncul di options sebagai kanji identik).\\n' +
-            '3. Hanya 1 jawaban benar, 3 lainnya salah tapi masuk akal.\\n' +
-            '4. Tidak ada options absurd atau tidak relevan konteks.\\n' +
-            '5. Choukai: listeningScript wajib ada, script natural, jawaban bisa disimpulkan dari isi script.\\n' +
-            '6. Dokkai: teks bacaan jelas, pertanyaan menjawab sesuatu yang ADA di teks.\\n' +
-            '7. Level A1: JANGAN gunakan kanji di luar daftar yang diizinkan.\\n' +
-            '8. Tidak ada karakter escape \\\\n atau \\\\t tampil ke user — gunakan newline nyata.';
+            '== QUALITY CHECK SEBELUM OUTPUT ==\n' +
+            '1. TIPE 3: semua 4 options = hiragana cara baca kata 【target】 (bukan kata lain).\n' +
+            '2. Tidak ada jawaban bocor verbatim di question.\n' +
+            '3. Hanya 1 jawaban benar.\n' +
+            '4. Choukai: listeningScript ada dan natural.\n' +
+            '5. Dokkai: gunakan \\n (bukan literal newline) dalam JSON string untuk baris baru.\n' +
+            '6. Level A1: JANGAN kanji di luar daftar yang diizinkan.';
 
-        // ── USER PROMPT ──────────────────────────────────────────────
         const user =
-            'Buat 1 paket ujian JFT-Basic level "' + levelLabel + '" dengan jumlah soal TEPAT:\\n' +
-            '  kanji_kotoba: ' + s.kanji_kotoba + ' soal (tiap tipe merata: Word Meaning, Word Usage, Kanji Reading, Kanji Meaning)\\n' +
-            '  expression  : ' + s.expression   + ' soal (campuran Grammar dan Expression)\\n' +
-            '  choukai     : ' + s.choukai      + ' soal (campuran Conversation, Shop, Announcement)\\n' +
-            '  dokkai      : ' + s.dokkai       + ' soal (campuran Content dan Information Search)\\n\\n' +
-            'Kembalikan JSON persis dengan struktur:\\n' +
-            '{"sections":{"kanji_kotoba":[...],"expression":[...],"choukai":[...],"dokkai":[...]}}\\n\\n' +
-            'Format soal standar: {"question":"...","options":["...","...","...","..."],"answer":"...","explanation":"..."}\\n' +
-            'Tambahan choukai : +"listeningScript":[{"speaker":"male"|"female","text":"..."},...], "maxPlay":1|2\\n' +
-            'Tambahan dokkai  : +"docType":"..."\\n\\n' +
-            '!!! INGAT TIPE 3 KANJI READING: options HARUS 4 cara baca hiragana berbeda dari KATA YANG SAMA di 【】, bukan kata lain. !!!\\n' +
-            'Balas LANGSUNG dengan JSON saja.';
+            'Buat paket ujian JFT-Basic level "' + levelLabel + '" dengan soal TEPAT:\n' +
+            '  kanji_kotoba=' + s.kanji_kotoba + ' (tiap tipe merata), expression=' + s.expression +
+            ', choukai=' + s.choukai + ' (campuran 3 tipe), dokkai=' + s.dokkai + ' (campuran 2 tipe)\n\n' +
+            'Struktur JSON:\n{"sections":{"kanji_kotoba":[...],"expression":[...],"choukai":[...],"dokkai":[...]}}\n\n' +
+            'Format standar: {"question":"...","options":["A","B","C","D"],"answer":"A","explanation":"..."}\n' +
+            'Choukai tambah: "listeningScript":[{"speaker":"male","text":"..."},...], "maxPlay":1|2\n' +
+            'Dokkai tambah: "docType":"..."\n\n' +
+            '!!! INGAT TIPE 3: options = 4 hiragana cara baca kata dalam 【】, BUKAN kata lain !!!\n' +
+            'Balas JSON saja.';
 
         return { system, user };
+    }
+
+    // Perbaiki literal newline di dalam JSON string value (sering dari output AI)
+    function _fixJsonLiteralNewlines(str) {
+        let inStr = false, esc = false, out = '';
+        for (let i = 0; i < str.length; i++) {
+            const c = str[i];
+            if (esc)                 { out += c; esc = false; continue; }
+            if (c === '\\' && inStr) { out += c; esc = true;  continue; }
+            if (c === '"')           { out += c; inStr = !inStr; continue; }
+            if (inStr && c === '\n') { out += '\\n'; continue; }
+            if (inStr && c === '\r') { continue; }
+            if (inStr && c === '\t') { out += '\\t'; continue; }
+            out += c;
+        }
+        return out;
     }
 
     function _extractJSON(text) {
@@ -605,14 +516,13 @@ const AI_JFT_SIM = (() => {
         const start = t.indexOf('{');
         const end   = t.lastIndexOf('}');
         if (start === -1 || end === -1 || end <= start) return null;
-        try {
-            return JSON.parse(t.slice(start, end + 1));
-        } catch (e) {
-            return null;
-        }
+        const candidate = t.slice(start, end + 1);
+        try { return JSON.parse(candidate); } catch (_) {}
+        // Coba lagi setelah fix literal newline di dalam string value
+        try { return JSON.parse(_fixJsonLiteralNewlines(candidate)); } catch (_) {}
+        return null;
     }
 
-    // Kanji dalam 【】 dari question — untuk deteksi answer leak TIPE 3
     function _extractKanjiTarget(question) {
         const m = question.match(/【([^】]+)】/);
         return m ? m[1] : null;
@@ -653,12 +563,19 @@ const AI_JFT_SIM = (() => {
 
         const src = (parsed.sections && typeof parsed.sections === 'object') ? parsed.sections : parsed;
         const out = {};
+        let totalValid = 0;
         for (const sec of SECTION_ORDER) {
             const arr   = Array.isArray(src[sec]) ? src[sec] : [];
             const valid = arr.filter(_isValidQuestion);
-            if (!valid.length) return null;
-            out[sec] = valid;
+            // Choukai: fallback — jika tidak ada listeningScript, anggap soal reading biasa
+            out[sec] = valid.length ? valid : [];
+            totalValid += valid.length;
         }
+        // Gagal hanya jika TOTAL soal yang valid sangat sedikit (<= 3)
+        if (totalValid <= 3) return null;
+        // Pastikan minimal 2 section punya soal
+        const sectionsWithData = SECTION_ORDER.filter(sec => out[sec].length > 0);
+        if (sectionsWithData.length < 2) return null;
         return out;
     }
 
