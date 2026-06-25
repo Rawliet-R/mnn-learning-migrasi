@@ -429,9 +429,16 @@ const AI_JFT_SIM = (() => {
             '  Contoh A1: Q="あさ おきて かおを あらいます。どこで しますか。" Opts=["おふろ","トイレ","だいどころ","しんしつ"] A="おふろ"\n' +
             '  Contoh A2: Q="工場で 機械の 電源を 切る ことです。なんと いいますか。" Opts=["停止","操作","点検","修理"] A="停止"\n\n' +
 
-            'TIPE 2 Word Usage: kalimat dengan (　) → pilih kata pengisi blank.\n' +
-            '  Contoh A1: Q="このりんごは (　) です。あまくて おいしいです。" Opts=["やすい","たかい","あまい","からい"] A="あまい"\n' +
-            '  Contoh A2: Q="だんだん 日本の 生活に (　) きました。" Opts=["なれて","ふえて","すすんで","もどって"] A="なれて"\n\n' +
+            'TIPE 2 Word Usage: kalimat dengan (　) → pilih kata pengisi blank.\\n' +
+            '  !!! KRITIS GRAMMAR: bentuk options HARUS sesuai dengan slot blank !!!\\n' +
+            '  • Jika blank diikuti ます → options = verb STEM (おき/ね/あらい/いき), BUKAN kamus (おきる/ねる)\\n' +
+            '  • Jika blank diikuti て/で → options = te-form (して/行って/来て), BUKAN kamus\\n' +
+            '  • Jika blank di akhir kalimat → options = bentuk kamus/lengkap\\n' +
+            '  • Jika blank diisi adjektif → options = adjektif sesuai posisi (sebelum です/noun)\\n' +
+            '  CONTOH SALAH (DILARANG): Q="毎月5時に（　）ます。" Opts=["おきる","ねる"] → jadi おきるます = SALAH!\\n' +
+            '  CONTOH BENAR: Q="毎日 6時に（　）ます。" Opts=["おき","ね","あらい","いき"] A="おき" → おきます = BENAR\\n' +
+            '  Contoh A1 adj: Q="このりんごは (　) です。あまくて おいしいです。" Opts=["やすい","たかい","あまい","からい"] A="あまい"\\n' +
+            '  Contoh A2 te-form: Q="日本の 生活に (　) きました。" Opts=["なれて","ふえて","すすんで","もどって"] A="なれて"\\n\\n' +
 
             'TIPE 3 Kanji Reading: kalimat dengan 【漢字】 → pilih CARA BACA kata 【itu】.\n' +
             '  !!! KRITIS: options = 4 CARA BACA BERBEDA dari kata 【YANG SAMA】, BUKAN kata lain !!!\n' +
@@ -462,13 +469,20 @@ const AI_JFT_SIM = (() => {
             'Script harus natural. Jawaban HARUS bisa disimpulkan dari script.\n' +
             '3 tipe (variasikan): (1) dialog 2 orang maxPlay:2, (2) percakapan toko/tempat umum maxPlay:2, (3) pengumuman 1 orang maxPlay:1\n\n' +
 
-            '== DOKKAI ==\n' +
-            'WAJIB field: "docType" — nilai: surat|memo|chat|email|pengumuman|brosur|jadwal|label_obat|papan_info|daftar_harga\n' +
-            'Format "question": teks bacaan + baris kosong + kalimat tanya. Gunakan \\n untuk baris baru dalam JSON string.\n' +
-            '2 tipe (variasikan):\n' +
-            '(1) Teks naratif: Q="フアン：山田さん、明日 会議は 何時からですか。\\n山田：10時からです。私は 9時半に 来て と 言われました。\\n\\nフアンさんは 何時に 来ますか。" Opts=["9時","9時半","10時","10時半"] A="9時半"\n' +
-            '(2) Tabel teks (tanpa gambar): Q="スーパーのチラシ\\n\\nりんご 100円\\nバナナ 150円\\nみかん 200円\\n\\nバナナは いくら ですか。" Opts=["100円","150円","200円","250円"] A="150円"\n' +
-            'Contoh jadwal: Q="やまだ工場 今週\\n\\n月 朝礼・機械チェック\\n火 製品検査\\n水 清掃\\n木 出荷\\n金 会議\\n\\n水曜日に 何が ありますか。" Opts=["朝礼","製品検査","清掃","出荷"] A="清掃"\n\n' +
+            '== DOKKAI ==\\n' +
+            'WAJIB field: "docType" — nilai: surat|memo|chat|email|pengumuman|brosur|jadwal|label_obat|papan_info|daftar_harga\\n' +
+            'Format "question": teks bacaan + \\\\n\\\\n + kalimat tanya (gunakan \\\\n untuk newline dalam JSON string).\\n' +
+            '!!! KRITIS: teks bacaan HARUS mengandung SEMUA info untuk menjawab pertanyaan dengan PASTI. Tidak boleh ambigu !!!\\n' +
+            '!!! DILARANG: tabel tanpa konteks situasi spesifik — mis. tabel cuaca tanpa info hari ini cuaca apa !!!\\n' +
+            '2 tipe (variasikan):\\n' +
+            '(1) Teks naratif/chat — contoh BENAR:\\n' +
+            '    Q="フアン：山田さん、明日 会議は 何時からですか。\\\\n山田：10時からです。私は 9時半に 来て と 言われました。\\\\n\\\\nフアンさんは 何時に 来ますか。"\\n' +
+            '    Opts=["9時","9時半","10時","10時半"] A="9時半"\\n' +
+            '(2) Tabel/daftar — contoh BENAR (teks sudah mengandung jawaban pasti):\\n' +
+            '    Harga: Q="スーパーのチラシ\\\\n\\\\nりんご 100円\\\\nバナナ 150円\\\\nみかん 200円\\\\n\\\\nバナナは いくら ですか。" Opts=["100円","150円","200円","250円"] A="150円"\\n' +
+            '    Jadwal: Q="やまだ工場 今週のスケジュール\\\\n\\\\n月曜日 朝礼\\\\n火曜日 製品検査\\\\n水曜日 清掃\\\\n木曜日 出荷\\\\n\\\\n火曜日に 何が ありますか。" Opts=["朝礼","製品検査","清掃","出荷"] A="製品検査"\\n' +
+            '    Label obat: Q="タント錠\\\\n1日3回 食後 1回2つ\\\\n眠くなることがあります\\\\n\\\\nこの薬を 飲んだ あと 何が おきますか。" Opts=["眠くなる","頭が痛くなる","熱が出る","食欲がなくなる"] A="眠くなる"\\n' +
+            '    CONTOH SALAH (ambigu — DILARANG): Q="晴れ 28度\\\\n雨 22度\\\\n曇り 24度\\\\n\\\\n今日は 何度 ですか。" — teks tidak menyebutkan hari ini cuaca apa!\\n\\n' +
 
             '== LEVEL: ' + levelGuide + ' ==\n\n' +
 
