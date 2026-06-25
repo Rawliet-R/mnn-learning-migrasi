@@ -556,35 +556,38 @@ const AI_JFT_SIM = (() => {
         return m ? m[1] : null;
     }
 
-    function _isValidQuestion(q) {
+    function _isValidQuestion(q, sectionHint) {
         if (!q || typeof q.question !== 'string' || !q.question.trim()) return false;
         if (!Array.isArray(q.options) || q.options.length !== 4) return false;
         if (!q.options.every(o => typeof o === 'string' && o.trim())) return false;
         if (typeof q.answer !== 'string' || !q.options.includes(q.answer)) return false;
         if (typeof q.explanation !== 'string') return false;
-        // Choukai: listeningScript wajib array of {speaker,text}
+
+        // Choukai: sanitize listeningScript — strip kalau rusak, jangan reject seluruh soal
         if (q.listeningScript !== undefined) {
-            if (!Array.isArray(q.listeningScript) || !q.listeningScript.length) return false;
-            if (!q.listeningScript.every(l => l && typeof l.text === 'string' && l.text.trim())) return false;
+            if (!Array.isArray(q.listeningScript) || !q.listeningScript.length) {
+                delete q.listeningScript;
+            } else {
+                q.listeningScript = q.listeningScript.filter(
+                    function(l) { return l && typeof l.text === 'string' && l.text.trim(); }
+                );
+                if (!q.listeningScript.length) delete q.listeningScript;
+            }
         }
-        // Anti-leak TIPE 3 Kanji Reading: jika ada 【target】, cek options tidak sama persis dengan target
+
+        // Anti-leak TIPE 3: opsi tidak boleh identik dengan kanji target
         const target = _extractKanjiTarget(q.question);
-        if (target) {
-            const allHiragana = q.options.every(o => /^[぀-ゟー゠-ヿ\s･・]+$/.test(o.trim()));
-            // Jika options bukan semua hiragana → kemungkinan AI mix type, tapi tetap loloskan
-            // Yang FATAL: salah satu option identik dengan target kanji
-            if (q.options.some(o => o.trim() === target)) return false; // target bocor verbatim
+        if (target && q.options.some(function(o) { return o.trim() === target; })) return false;
+
+        // Dokkai: jawaban harga/jam/angka wajib ada di teks bacaan
+        if (sectionHint === 'dokkai') {
+            var ans = q.answer.trim();
+            var isFact = /[0-9０-９]+[円時分日月]/.test(ans);
+            if (isFact && q.question.indexOf(ans) === -1) return false;
         }
+
         return true;
     }
-
-    /**
-     * Parse + validasi JSON dari AI. Toleran terhadap jumlah soal yang
-     * sedikit berbeda dari permintaan (mis. AI mengembalikan 15 dari 16
-     * yang diminta) — soal yang valid tetap dipakai. Section yang
-     * akhirnya kosong sama sekali dianggap GAGAL.
-     * @returns {object|null} { kanji_kotoba:[...], expression:[...], dokkai:[...] } atau null jika gagal total
-     */
     function _parseAndValidate(raw) {
         const parsed = _extractJSON(raw);
         if (!parsed || typeof parsed !== 'object') {
@@ -600,7 +603,7 @@ const AI_JFT_SIM = (() => {
         const secReport = {};
         for (const sec of SECTION_ORDER) {
             const arr   = Array.isArray(src[sec]) ? src[sec] : [];
-            const valid = arr.filter(_isValidQuestion);
+            const valid = arr.filter(q => _isValidQuestion(q, sec));
             out[sec]         = valid;
             totalValid      += valid.length;
             secReport[sec]   = valid.length + '/' + arr.length;
