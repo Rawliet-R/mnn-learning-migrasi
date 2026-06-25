@@ -559,23 +559,33 @@ const AI_JFT_SIM = (() => {
      */
     function _parseAndValidate(raw) {
         const parsed = _extractJSON(raw);
-        if (!parsed || typeof parsed !== 'object') return null;
+        if (!parsed || typeof parsed !== 'object') {
+            console.error('[AI_JFT_SIM] _extractJSON gagal parse JSON');
+            return null;
+        }
 
+        // Support struktur { sections: {...} } ATAU { kanji_kotoba: [...], ... }
         const src = (parsed.sections && typeof parsed.sections === 'object') ? parsed.sections : parsed;
+
         const out = {};
         let totalValid = 0;
+        const secReport = {};
         for (const sec of SECTION_ORDER) {
             const arr   = Array.isArray(src[sec]) ? src[sec] : [];
             const valid = arr.filter(_isValidQuestion);
-            // Choukai: fallback — jika tidak ada listeningScript, anggap soal reading biasa
-            out[sec] = valid.length ? valid : [];
-            totalValid += valid.length;
+            out[sec]         = valid;
+            totalValid      += valid.length;
+            secReport[sec]   = valid.length + '/' + arr.length;
         }
-        // Gagal hanya jika TOTAL soal yang valid sangat sedikit (<= 3)
-        if (totalValid <= 3) return null;
-        // Pastikan minimal 2 section punya soal
+        console.debug('[AI_JFT_SIM] validasi soal per section:', secReport, '| total valid:', totalValid);
+
+        // Tolak hanya jika benar-benar tidak ada soal sama sekali
+        if (totalValid === 0) return null;
+
+        // Pastikan minimal 1 section punya soal
         const sectionsWithData = SECTION_ORDER.filter(sec => out[sec].length > 0);
-        if (sectionsWithData.length < 2) return null;
+        if (sectionsWithData.length === 0) return null;
+
         return out;
     }
 
@@ -629,8 +639,15 @@ const AI_JFT_SIM = (() => {
             const raw = data?.choices?.[0]?.message?.content;
             if (!raw) throw new Error('Respon AI kosong. Coba lagi.');
 
+            // Debug log — tampilkan 400 karakter pertama respons AI di console
+            console.debug('[AI_JFT_SIM] raw AI response (first 400):', (raw || '').slice(0, 400));
+
             const sections = _parseAndValidate(raw);
-            if (!sections) throw new Error('Format soal dari AI tidak valid. Coba lagi.');
+            if (!sections) {
+                // Log lebih detail untuk debugging
+                console.error('[AI_JFT_SIM] _parseAndValidate GAGAL. Raw length:', raw?.length, '| First 200:', (raw || '').slice(0, 200));
+                throw new Error('Format soal dari AI tidak valid. Coba lagi.');
+            }
 
             // ── Generate berhasil → simpan ke Firestore dulu, BARU potong credit ──
             const ref = _sessionsRef();
