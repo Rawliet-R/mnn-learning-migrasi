@@ -76,6 +76,20 @@ const AI_JFT_SIM = (() => {
         choukai:      '🎧 Choukai',
     };
 
+    // _renderText: escape HTML + konversi \n literal dan newline asli ke <br>
+    // Mengatasi AI yang menghasilkan \\n (literal) maupun newline asli di JSON value.
+    function _renderText(str) {
+        if (!str) return '';
+        var escaped = String(str)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        // Konversi \n (literal dua karakter) ke <br>
+        escaped = escaped.replace(/\\n/g, '<br>');
+        // Konversi newline karakter asli ke <br>
+        escaped = escaped.replace(/\n/g, '<br>');
+        return escaped;
+    }
+
     // ─────────────────────────────────────────────────────
     // STATE (in-memory, hilang saat reload — lihat catatan di chat)
     // ─────────────────────────────────────────────────────
@@ -438,7 +452,9 @@ const AI_JFT_SIM = (() => {
             '  CONTOH SALAH (DILARANG): Q="毎月5時に（　）ます。" Opts=["おきる","ねる"] → jadi おきるます = SALAH!\\n' +
             '  CONTOH BENAR: Q="毎日 6時に（　）ます。" Opts=["おき","ね","あらい","いき"] A="おき" → おきます = BENAR\\n' +
             '  Contoh A1 adj: Q="このりんごは (　) です。あまくて おいしいです。" Opts=["やすい","たかい","あまい","からい"] A="あまい"\\n' +
-            '  Contoh A2 te-form: Q="日本の 生活に (　) きました。" Opts=["なれて","ふえて","すすんで","もどって"] A="なれて"\\n\\n' +
+            '  Contoh A2 te-form: Q="日本の 生活に (　) きました。" Opts=["なれて","ふえて","すすんで","もどって"] A="なれて"\\n' +
+            '  • Jika blank diikuti をします → options = NOMINA (名詞), BUKAN verb\\n' +
+            '    Contoh: Q="公園で（　）をします。" Opts=["散歩","運動","ジョギング","ピクニック"] A="散歩" — BUKAN 遊んで/あそぶ\\n\\n' +
 
             'TIPE 3 Kanji Reading: kalimat dengan 【漢字】 → pilih CARA BACA kata 【itu】.\n' +
             '  !!! KRITIS: options = 4 CARA BACA BERBEDA dari kata 【YANG SAMA】, BUKAN kata lain !!!\n' +
@@ -463,11 +479,17 @@ const AI_JFT_SIM = (() => {
             '  Contoh: Q="店員：ありがとうございました。\\n客：(　　　)" Opts=["こちらこそ","またこんど","おじゃまします","ごめんください"] A="こちらこそ"\n' +
             '  [X] options bukan terjemahan Indonesia. Semua ungkapan Jepang natural.\n\n' +
 
-            '== CHOUKAI ==\n' +
-            'WAJIB field: "listeningScript":[{"speaker":"male"|"female","text":"..."},...], "maxPlay":1|2\n' +
-            '"question" = pertanyaan setelah dengar audio, BUKAN kutipan script.\n' +
-            'Script harus natural. Jawaban HARUS bisa disimpulkan dari script.\n' +
-            '3 tipe (variasikan): (1) dialog 2 orang maxPlay:2, (2) percakapan toko/tempat umum maxPlay:2, (3) pengumuman 1 orang maxPlay:1\n\n' +
+            '== CHOUKAI ==\\n' +
+            'WAJIB 3 field di setiap soal choukai:\\n' +
+            '  "listeningScript": [{"speaker":"male"|"female","text":"..."},...] — isi dialog/pengumuman\\n' +
+            '  "maxPlay": 1 atau 2\\n' +
+            '  "question": kalimat tanya singkat saja (BUKAN isi script)\\n' +
+            '!!! LARANGAN MUTLAK: JANGAN taruh isi dialog di field "question" !!!\\n' +
+            '!!! LARANGAN MUTLAK: JANGAN gunakan \\\\n di field "question" choukai !!!\\n' +
+            'SALAH: question="A: 明日は？\\\\nB: 映画を見ます。\\\\n\\\\nAさんは明日何をしますか？"\\n' +
+            'BENAR: listeningScript=[{speaker:"male",text:"明日は何をしますか？"},{speaker:"female",text:"家で映画を見ます。"}], question="Bさんは明日何をしますか？"\\n' +
+            'Script natural. Jawaban disimpulkan dari listeningScript saja.\\n' +
+            '3 tipe (variasikan): dialog 2 orang maxPlay:2 | percakapan toko maxPlay:2 | pengumuman 1 speaker maxPlay:1\\n\\n' +
 
             '== DOKKAI ==\\n' +
             'WAJIB field: "docType" — nilai: surat|memo|chat|email|pengumuman|brosur|jadwal|label_obat|papan_info|daftar_harga\\n' +
@@ -941,7 +963,7 @@ const AI_JFT_SIM = (() => {
 
         body.innerHTML =
             (imgBlock ? '<div class="aijs-q-visual">' + imgBlock + '</div>' : '') +
-            '<div class="aijs-q-card"><div class="aijs-q-text">' + escHTML(q.question) + '</div></div>' +
+            '<div class="aijs-q-card"><div class="aijs-q-text">' + _renderText(q.question) + '</div></div>' +
             '<div class="aijs-option-list" id="aijs-option-list">' + optionsHtml + '</div>' +
             '<div id="aijs-feedback-slot"></div>';
 
@@ -963,7 +985,7 @@ const AI_JFT_SIM = (() => {
         body.innerHTML =
             '<div class="aijs-choukai-wrap">' +
             warn +
-            '<div class="aijs-q-card"><div class="aijs-choukai-question-text">' + escHTML(q.question) + '</div></div>' +
+            '<div class="aijs-q-card"><div class="aijs-choukai-question-text">' + _renderText(q.question) + '</div></div>' +
             '<div class="aijs-choukai-player" id="aijs-choukai-player">' +
             (hasAudio
                 ? '<div class="aijs-choukai-play-area">' +
@@ -1004,7 +1026,7 @@ const AI_JFT_SIM = (() => {
             const icon = l.speaker === 'male' ? '👨' : '👩';
             return '<div class="aijs-script-line aijs-script-' + escHTML(l.speaker || 'female') + '">' +
                    '<span class="aijs-script-icon">' + icon + '</span>' +
-                   '<span class="aijs-script-text">' + escHTML(l.text || '') + '</span></div>';
+                   '<span class="aijs-script-text">' + _renderText(l.text || '') + '</span></div>';
         }).join('');
         player.innerHTML = '<div class="aijs-script-box">' + lines + '</div>';
     }
@@ -1021,7 +1043,7 @@ const AI_JFT_SIM = (() => {
                 const icon = l.speaker === 'male' ? '&#128104;' : '&#128105;';
                 return '<div class="aijs-script-line aijs-script-' + escHTML(l.speaker || 'female') + '">' +
                        '<span class="aijs-script-icon">' + icon + '</span>' +
-                       '<span class="aijs-script-text">' + escHTML(l.text || '') + '</span></div>';
+                       '<span class="aijs-script-text">' + _renderText(l.text || '') + '</span></div>';
             }).join('');
 
             const canReplay = _TTS.ALLOW_REPLAY && _TTS._hasJpVoice() && playCount < maxPlay;
