@@ -677,3 +677,123 @@
   font-size: 11px;
   color: var(--text-secondary);
 }
+
+/* ══ Choukai Play Button (added fix) ══════════════════════════════════ */
+.aijs-choukai-play-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 16px 12px;
+}
+
+.aijs-play-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #4f8ef7;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 32px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .18s, transform .1s, opacity .18s;
+  min-width: 200px;
+  justify-content: center;
+}
+
+.aijs-play-btn:hover:not(:disabled) { background: #3a79e6; transform: translateY(-1px); }
+.aijs-play-btn:active:not(:disabled) { transform: translateY(0); }
+.aijs-play-btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+
+.aijs-play-hint { font-size: 12px; font-weight: 500; opacity: .75; }
+
+.aijs-choukai-hint {
+  font-size: 13px;
+  opacity: .65;
+  text-align: center;
+  margin: 0;
+}
+
+.aijs-choukai-noscript {
+  font-size: 13px;
+  opacity: .65;
+  text-align: center;
+  padding: 12px 0;
+}
+
+.aijs-replay-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: background .15s;
+}
+.aijs-replay-btn:hover:not(:disabled) { background: rgba(255,255,255,.08); }
+.aijs-replay-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+.aijs-script-box {
+  background: rgba(255,255,255,.05);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 8px 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.aijs-script-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.aijs-script-icon { font-size: 18px; flex-shrink: 0; }
+
+/* ══ Timer hero fix ════════════════════════════════════════════════════ */
+.aijs-timer-hero {
+  text-align: center;
+  padding: 8px 20px 12px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.aijs-timer-hero-time {
+  font-size: clamp(36px, 7vw, 56px);
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.aijs-timer-hero-label {
+  font-size: 11px;
+  letter-spacing: 2px;
+  opacity: .5;
+  text-transform: uppercase;
+  margin: 2px 0 6px;
+}
+
+.aijs-timer-hero-section {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.aijs-timer-hero-pos {
+  font-size: 11px;
+  opacity: .5;
+  margin-top: 2px;
+}
+
+.aijs-timer-hero-warning .aijs-timer-hero-time { color: #ff5a5a; }

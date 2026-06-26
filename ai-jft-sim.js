@@ -504,10 +504,14 @@ const AI_JFT_SIM = (() => {
         const target = _m ? _m[1] : null;
         if (target && q.options.some(o => o.trim() === target)) return false;
 
-        // Dokkai: jawaban harga/jam wajib ada di teks bacaan
+        // Dokkai: factcheck lenient — cek digit utama ada di teks (bukan exact match)
         if (sectionHint === 'dokkai') {
             const ans = q.answer.trim();
-            if (/[0-9０-９]+[円時分日月]/.test(ans) && q.question.indexOf(ans) === -1) return false;
+            const numMatch = ans.match(/[0-9０-９]+/);
+            if (numMatch && /[0-9０-９]+[円時分日月]/.test(ans)) {
+                // Cek hanya angkanya ada di teks (bukan exact string match)
+                if (!q.question.includes(numMatch[0])) return false;
+            }
         }
 
         return true;
