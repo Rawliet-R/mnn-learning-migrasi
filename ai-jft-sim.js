@@ -63,9 +63,9 @@ const AI_JFT_SIM = (() => {
     // DEFAULT yang bisa disesuaikan kapan saja — total soal & credit cost
     // mengikuti spesifikasi persis dari permintaan awal.
     const MODES = {
-        easy:   { label: 'Easy',   totalSoal: 10, credit: 5,  maxTokens: 4000, timerSeconds: 900,  sections: { kanji_kotoba: 3,  expression: 2,  choukai: 2,  dokkai: 3  } },
-        normal: { label: 'Normal', totalSoal: 20, credit: 10, maxTokens: 7000, timerSeconds: 1800, sections: { kanji_kotoba: 6,  expression: 5,  choukai: 4,  dokkai: 5  } },
-        full:   { label: 'Full',   totalSoal: 40, credit: 20, maxTokens: 12000, timerSeconds: 3600, sections: { kanji_kotoba: 12, expression: 10, choukai: 8,  dokkai: 10 } },
+        easy:   { label: 'Easy',   totalSoal: 10, credit: 5,  maxTokens: 4500, timerSeconds: 900,  sections: { kanji_kotoba: 3,  expression: 2,  choukai: 2,  dokkai: 3  } },
+        normal: { label: 'Normal', totalSoal: 20, credit: 10, maxTokens: 7500, timerSeconds: 1800, sections: { kanji_kotoba: 6,  expression: 5,  choukai: 4,  dokkai: 5  } },
+        full:   { label: 'Full',   totalSoal: 40, credit: 20, maxTokens: 13000, timerSeconds: 3600, sections: { kanji_kotoba: 12, expression: 10, choukai: 8,  dokkai: 10 } },
     };
 
     const SECTION_ORDER  = ['kanji_kotoba', 'expression', 'choukai', 'dokkai'];
@@ -76,18 +76,11 @@ const AI_JFT_SIM = (() => {
         choukai:      '🎧 Choukai',
     };
 
-    // _renderText: escape HTML + konversi \n literal dan newline asli ke <br>
-    // Mengatasi AI yang menghasilkan \\n (literal) maupun newline asli di JSON value.
+    // Render text: escape HTML + convert \n literals to <br>
     function _renderText(str) {
         if (!str) return '';
-        var escaped = String(str)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-        // Konversi \n (literal dua karakter) ke <br>
-        escaped = escaped.replace(/\\n/g, '<br>');
-        // Konversi newline karakter asli ke <br>
-        escaped = escaped.replace(/\n/g, '<br>');
-        return escaped;
+        var e = String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        return e.replace(/\\n/g,'<br>').replace(/\n/g,'<br>');
     }
 
     // ─────────────────────────────────────────────────────
@@ -410,150 +403,72 @@ const AI_JFT_SIM = (() => {
         await _generateSession(_selectedLevel, _selectedMode, cfg);
     }
 
-    // ──────────────────────────────────────────────────────────────────
-    // LEVEL GUIDE
-    // ──────────────────────────────────────────────────────────────────
     function _levelGuide(levelId) {
         const g = {
-            a1: 'A1 Pemula (CEFR A1): kosakata SANGAT dasar. Kalimat max 10 kata. HANYA kanji: 人日本水火木金土月山川大小中上下食飲見行来帰時間円店駅学校先生。JANGAN kanji lain.',
-            a1plus: 'A1+ Dasar: kosakata dasar-menengah. Partikel は/が/を/に/で/の. Topik: belanja, transportasi, instruksi pendek.',
-            a2: 'A2 Awal Kerja (JFT-Basic standard): format resmi JFT. Kosakata kerja. Topik: kantor, pabrik, konbini, stasiun, rumah sakit.',
-            a2plus: 'A2+ Siap Kerja: soal kompleks. Pengumuman resmi, formulir, instruksi multi-langkah, ungkapan hormat.',
-            n5: 'N5 (setara A1): kosakata & tata bahasa paling dasar.', n4: 'N4 (setara A2): menengah-dasar.',
-            jft_basic: 'JFT-Basic (CEFR A2): format resmi Japan Foundation, situasi kerja & harian.',
+            a1:'A1 Pemula: kosakata SANGAT dasar. Kalimat max 10 kata. Kanji HANYA: 人日本水火木金土月山川大小中上下食飲見行来帰時間円店駅学校先生.',
+            a1plus:'A1+ Dasar: kosakata berkembang, partikel はがをにでの. Topik: belanja, transportasi.',
+            a2:'A2 Awal Kerja (JFT-Basic): format resmi JFT. Kosakata kerja.',
+            a2plus:'A2+ Siap Kerja: pengumuman resmi, formulir, instruksi kompleks.',
+            n5:'N5: dasar.', n4:'N4: menengah-dasar.', jft_basic:'JFT-Basic (CEFR A2).'
         };
         return g[levelId] || g.a2;
     }
 
-    // ──────────────────────────────────────────────────────────────────
-    // BUILD PROMPT  — single-call architecture
-    // ──────────────────────────────────────────────────────────────────
     function _buildPrompt(levelId, cfg) {
         const levelLabel = LEVELS[levelId] || levelId;
         const levelGuide = _levelGuide(levelId);
         const s = cfg.sections;
-
         const system =
-            'Kamu adalah pembuat soal ujian JFT-Basic untuk aplikasi MNN Learning. ' +
-            'Balas HANYA dengan JSON murni, tanpa teks lain, tanpa markdown fence.\n\n' +
-
-            '== KANJI & KOTOBA: 4 TIPE WAJIB MERATA ==\n' +
-
-            'TIPE 1 Word Meaning: deskripsi situasi singkat \u2192 pilih kata.\n' +
-            '  Contoh A1: Q="\u3042\u3055 \u304a\u304d\u3066 \u304b\u304a\u3092 \u3042\u3089\u3044\u307e\u3059\u3002 \u3069\u3053\u3067 \u3057\u307e\u3059\u304b\u3002" Opts=["\u304a\u3075\u308d","\u30c8\u30a4\u30ec","\u3060\u3044\u3069\u3053\u308d","\u3057\u3093\u3057\u3064"] A="\u304a\u3075\u308d"\n\n' +
-
-            'TIPE 2 Word Usage: kalimat dengan (\u3000) \u2192 pilih kata pengisi blank.\n' +
-            '  GRAMMAR KRITIS:\n' +
-            '  \u2022 blank + \u307e\u3059 \u2192 options = stem verb (\u304a\u304d/\u306d/\u3042\u3089\u3044)\n' +
-            '  \u2022 blank + \u3066\u304d\u307e\u3057\u305f \u2192 options = te-form (\u306a\u308c\u3066/\u3075\u3048\u3066)\n' +
-            '  \u2022 blank + \u3092\u3057\u307e\u3059 \u2192 options = NOMINA (\u6563\u6b69/\u904b\u52d5), BUKAN verb\n' +
-            '  \u2022 blank + \u3067\u3059 \u2192 options = adjektif (\u304a\u304d\u3044/\u3084\u3059\u3044)\n' +
-            '  Contoh BENAR stem: Q="\u6bce\u65e5 6\u6642\u306b (\u3000) \u307e\u3059\u3002" Opts=["\u304a\u304d","\u306d","\u3042\u3089\u3044","\u3044\u304d"] A="\u304a\u304d"\n' +
-            '  Contoh BENAR nomina: Q="\u516c\u5712\u3067 (\u3000) \u3092\u3057\u307e\u3059\u3002" Opts=["\u6563\u6b69","\u904b\u52d5","\u30b8\u30e7\u30ae\u30f3\u30b0","\u30d4\u30af\u30cb\u30c3\u30af"] A="\u6563\u6b69"\n\n' +
-
-            'TIPE 3 Kanji Reading: kalimat dengan [\u6f22\u5b57] \u2192 pilih CARA BACA kata itu (hiragana).\n' +
-            '  !!! options = 4 cara baca BERBEDA dari kata YANG SAMA, BUKAN kata lain !!!\n' +
-            '  Contoh: Q="\u3048\u304d\u306e \u307e\u3048\u306b [\u96fb\u8a71] \u30dc\u30c3\u30af\u30b9\u304c \u3042\u308a\u307e\u3059\u3002" Opts=["\u3067\u3093\u308f","\u3066\u3093\u308f","\u3067\u3044\u308f","\u3068\u3093\u308f"] A="\u3067\u3093\u308f"\n\n' +
-
-            'TIPE 4 Kanji Meaning: kalimat dengan (\u3000) \u2192 pilih kata kanji.\n' +
-            '  Contoh: Q="\u6771\u4eac\u30bf\u30ef\u30fc\u304c \u591c \u3042\u304b\u308b\u304f (\u3000) \u3044\u3066 \u304d\u308c\u3044\u3067\u3057\u305f\u3002" Opts=["\u4e57\u3063\u3066","\u5149\u3063\u3066","\u901a\u3063\u3066","\u8d70\u3063\u3066"] A="\u5149\u3063\u3066"\n\n' +
-
-            'ANTI-BUG KANJI: [X] options tidak sesuai slot blank | [X] jawaban bocor di soal | [X] flashcard tanpa kalimat\n\n' +
-
+            'Kamu adalah pembuat soal ujian JFT-Basic untuk MNN Learning. Balas HANYA JSON murni.\n\n' +
+            '== KANJI & KOTOBA (4 tipe merata) ==\n' +
+            'TIPE 1 Word Meaning: situasi singkat → pilih kata.\n' +
+            '  A1: Q="かおをあらいます。どこでしますか。" Opts=["おふろ","トイレ","だいどころ","しんしつ"] A="おふろ"\n\n' +
+            'TIPE 2 Word Usage: kalimat+(　)→pilih. GRAMMAR WAJIB:\n' +
+            '  +ます→stem(おき/ね) | +てきました→te(なれて) | +をします→nomina(散歩) | +です→adj(あまい)\n' +
+            '  BENAR: Q="毎日 6時に(　)ます。" Opts=["おき","ね","あらい","いき"] A="おき"\n\n' +
+            'TIPE 3 Kanji Reading: [漢字]→4 cara baca HIRAGANA kata ITU. BUKAN kata lain!\n' +
+            '  BENAR: Q="[電話]ボックス" Opts=["でんわ","てんわ","でいわ","とんわ"] A="でんわ"\n\n' +
+            'TIPE 4 Kanji Meaning: (　)→pilih kanji. Opts=["乗って","光って","通って","走って"] A="光って"\n\n' +
             '== EXPRESSION ==\n' +
-            '!!! ATURAN WAJIB PERAN DIALOG !!!\n' +
-            '  \u2022 \u3044\u3089\u3063\u3057\u3083\u3044\u307e\u305b = SELALU diucapkan \u5e97\u54e1 kepada \u5ba2, TIDAK PERNAH sebaliknya\n' +
-            '  \u2022 Jika \u5e97\u54e1 sudah berkata \u3044\u3089\u3063\u3057\u3083\u3044\u307e\u305b, \u5ba2 merespons (bukan \u5e97\u54e1 lagi)\n' +
-            '  \u2022 Jika A bertanya \u3053\u308c\u306f\u3044\u304f\u3089\u3067\u3059\u304b\uff1f, jawaban B HARUS harga (300\u5186\u3067\u3059, dll), BUKAN adjektif\n' +
-            '  \u2022 Jika A bertanya \u4f55\u6642\u3067\u3059\u304b\uff1f, jawaban B HARUS waktu (3\u6642\u3067\u3059, dll)\n' +
-            '  \u2022 Jika A bertanya \u3069\u3053\u3067\u3059\u304b\uff1f, jawaban B HARUS lokasi\n' +
-            '  [X] DILARANG: options yang tidak relevan konteks pertanyaan (adjektif untuk pertanyaan harga, dll)\n' +
-            '  Variasi: dialog toko | dialog kantor | dialog telepon | layanan publik\n' +
-            '  Format blank: (\u3000\u3000\u3000) BUKAN [\u3000\u3000]\n\n' +
-
+            'いらっしゃいませ=SELALU 店員→客. Tanya いくら？→HARGA(300円). Tanya 何時？→JAM(3時). Blank:(　　　).\n' +
+            'Options=ungkapan Jepang natural, relevan konteks dialog.\n\n' +
             '== CHOUKAI ==\n' +
-            '!!! ATURAN KONTEKS WAJIB !!!\n' +
-            '  \u2022 Jika question tanya JAM \u2192 listeningScript HARUS sebut jam spesifik\n' +
-            '  \u2022 Jika question tanya TEMPAT \u2192 listeningScript HARUS sebut tempat spesifik\n' +
-            '  \u2022 Jika question tanya HARGA \u2192 listeningScript HARUS sebut harga spesifik\n' +
-            '  \u2022 Jawaban HARUS bisa disimpulkan dari listeningScript saja\n' +
-            'WAJIB field: "listeningScript":[{speaker:"male"|"female",text:"..."},...], "maxPlay":1|2\n' +
-            '"question" = kalimat tanya singkat SAJA, BUKAN isi script\n' +
-            '[X] DILARANG: script tidak mengandung info yang ditanyakan\n' +
-            'Contoh BENAR: script="A:\u4eca\u65e5\u306e\u4f1a\u8b70\u306f\u4f55\u6642\u3067\u3059\u304b\uff1f B:10\u6642\u304b\u3089\u3067\u3059\u3002" question="\u4f1a\u8b70\u306f\u4f55\u6642\u304b\u3089\u3067\u3059\u304b\uff1f" \u2192 jawaban 10\u6642 ADA di script\n' +
-            'Contoh SALAH: script="\u4eca\u65e5\u306f\u4f1a\u8b70\u3092\u3057\u307e\u3059\u3002" question="\u4f1a\u8b70\u306f\u4f55\u6642\u304b\u3089\u3067\u3059\u304b\uff1f" \u2192 jam tidak ada di script = DILARANG\n\n' +
-
+            'WAJIB: "listeningScript":[{"speaker":"male"|"female","text":"..."},...], "maxPlay":1|2.\n' +
+            '"question"=kalimat tanya SINGKAT (bukan isi script, tanpa \\n).\n' +
+            'INFO DITANYA HARUS ADA DI SCRIPT: tanya jam→script sebut jam; tanya harga→script sebut harga.\n' +
+            'BENAR: [{m:"会議は何時?"},{f:"10時から"}] q="会議は何時から?" → 10時 ADA.\n' +
+            'SALAH: [{f:"会議です"}] q="会議は何時?" → jam tidak ada!\n' +
+            '3 tipe: dialog maxPlay:2 | toko maxPlay:2 | pengumuman maxPlay:1.\n\n' +
             '== DOKKAI ==\n' +
-            '!!! ATURAN KONTEKS WAJIB !!!\n' +
-            '  \u2022 Teks bacaan HARUS memuat SEMUA fakta spesifik untuk menjawab pertanyaan\n' +
-            '  \u2022 Jika tanya HARGA \u2192 teks HARUS ada harga (100\u5186, 200\u5186, dll)\n' +
-            '  \u2022 Jika tanya JAM \u2192 teks HARUS ada jam spesifik\n' +
-            '  \u2022 Jika tanya TEMPAT \u2192 teks HARUS ada lokasi spesifik\n' +
-            '  \u2022 Teks bacaan minimal 3 kalimat atau 3 baris data\n' +
-            '  [X] DILARANG: tanya harga tapi teks tidak ada harga\n' +
-            '  [X] DILARANG: soal fill-in-blank tanpa teks bacaan (itu bukan dokkai!)\n' +
-            '  [X] DILARANG: tanya lokasi tapi teks tidak menyebut lokasi\n' +
-            'WAJIB field: "docType": surat|memo|chat|email|pengumuman|brosur|jadwal|label_obat|papan_info|daftar_harga\n' +
-            'Format question: [teks bacaan] + dua baris kosong + [kalimat tanya]\n' +
-            'Contoh BENAR daftar_harga:\n' +
-            '  Q="\u30b9\u30fc\u30d1\u30fc\u306e\u30c1\u30e9\u30b7\\n\\n\u308a\u3093\u3054 100\u5186\\n\u30d0\u30ca\u30ca 150\u5186\\n\u307f\u304b\u3093 200\u5186\\n\\n\u30d0\u30ca\u30ca\u306f\u3044\u304f\u3089\u3067\u3059\u304b\u3002" Opts=["100\u5186","150\u5186","200\u5186","250\u5186"] A="150\u5186"\n' +
-            'Contoh SALAH:\n' +
-            '  Q="\u3053\u306e\u5e97\u3067\u306f\u308a\u3093\u3054\u3001\u30d0\u30ca\u30ca\u3001\u30aa\u30ec\u30f3\u30b8\u304c\u58f2\u3063\u3066\u3044\u307e\u3059\u3002\u308a\u3093\u3054\u306f\u3044\u304f\u3089\u3067\u3059\u304b\u3002" \u2192 tidak ada harga = DILARANG\n\n' +
-
-            '== LEVEL: ' + levelGuide + ' ==\n\n' +
-
-            '== QUALITY CHECK ==\n' +
-            '1. TIPE 3: options = 4 cara baca hiragana kata target, BUKAN kata lain\n' +
-            '2. Expression: peran dialog benar, jawaban sesuai jenis pertanyaan\n' +
-            '3. Choukai: listeningScript ada & memuat info yang ditanyakan\n' +
-            '4. Dokkai: teks bacaan ada & memuat semua fakta untuk menjawab\n' +
-            '5. Level A1: kanji terbatas sesuai whitelist';
+            '"docType": surat|memo|chat|email|pengumuman|brosur|jadwal|label_obat|papan_info|daftar_harga.\n' +
+            'TEKS HARUS MEMUAT FAKTA UNTUK MENJAWAB: harga→ada harga; jam→ada jam; populer→sebutkan mana.\n' +
+            'BENAR: "りんご 100円\nバナナ 150円\nバナナは?" A="150円".\n' +
+            'SALAH: "りんご、バナナを売っています。りんごは?" → harga tidak ada!\n' +
+            'SALAH: "おいしいレストラン。一番人気は?" → tidak disebutkan mana paling populer!\n\n' +
+            '== LEVEL == ' + levelGuide + '\n\n' +
+            'QUALITY: TIPE3=hiragana cara baca | expression peran benar | choukai script ada info | dokkai teks ada fakta';
         const user =
-            'Buat paket ujian JFT-Basic level "' + levelLabel + '" dengan soal TEPAT:\n' +
-            '  kanji_kotoba=' + s.kanji_kotoba + ' (tiap tipe merata), expression=' + s.expression +
-            ', choukai=' + s.choukai + ' (campuran 3 tipe), dokkai=' + s.dokkai + ' (campuran 2 tipe)\n\n' +
-            'Struktur JSON:\n{"sections":{"kanji_kotoba":[...],"expression":[...],"choukai":[...],"dokkai":[...]}}\n\n' +
-            'Format standar: {"question":"...","options":["A","B","C","D"],"answer":"A","explanation":"..."}\n' +
-            'Choukai tambah: "listeningScript":[{"speaker":"male","text":"..."},...], "maxPlay":1|2\n' +
-            'Dokkai tambah: "docType":"..."\n\n' +
-            '!!! INGAT TIPE 3: options = 4 hiragana cara baca kata dalam 【】, BUKAN kata lain !!!\n' +
+            'Buat paket JFT-Basic level "' + levelLabel + '" soal TEPAT: ' +
+            'choukai=' + s.choukai + ' | kanji_kotoba=' + s.kanji_kotoba + ' | expression=' + s.expression + ' | dokkai=' + s.dokkai + '\n\n' +
+            'JSON (choukai PERTAMA):\n{"sections":{"choukai":[...],"kanji_kotoba":[...],"expression":[...],"dokkai":[...]}}\n\n' +
+            'Format: {"question":"...","options":["A","B","C","D"],"answer":"A","explanation":"..."}\n' +
+            'Choukai+: "listeningScript":[{"speaker":"male","text":"..."},...], "maxPlay":2\n' +
+            'Dokkai+: "docType":"..."\n\n' +
+            '!!! CHOUKAI WAJIB ADA: buat ' + s.choukai + ' soal dengan listeningScript lengkap !!!\n' +
             'Balas JSON saja.';
-
         return { system, user };
     }
-
-    // Perbaiki literal newline di dalam JSON string value (sering dari output AI)
-    function _fixJsonLiteralNewlines(str) {
-        let inStr = false, esc = false, out = '';
-        for (let i = 0; i < str.length; i++) {
-            const c = str[i];
-            if (esc)                 { out += c; esc = false; continue; }
-            if (c === '\\' && inStr) { out += c; esc = true;  continue; }
-            if (c === '"')           { out += c; inStr = !inStr; continue; }
-            if (inStr && c === '\n') { out += '\\n'; continue; }
-            if (inStr && c === '\r') { continue; }
-            if (inStr && c === '\t') { out += '\\t'; continue; }
-            out += c;
-        }
-        return out;
-    }
-
     function _extractJSON(text) {
         let t = String(text || '').trim();
         t = t.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
         const start = t.indexOf('{');
         const end   = t.lastIndexOf('}');
         if (start === -1 || end === -1 || end <= start) return null;
-        const candidate = t.slice(start, end + 1);
-        try { return JSON.parse(candidate); } catch (_) {}
-        // Coba lagi setelah fix literal newline di dalam string value
-        try { return JSON.parse(_fixJsonLiteralNewlines(candidate)); } catch (_) {}
-        return null;
-    }
-
-    function _extractKanjiTarget(question) {
-        const m = question.match(/【([^】]+)】/);
-        return m ? m[1] : null;
+        try {
+            return JSON.parse(t.slice(start, end + 1));
+        } catch (e) {
+            return null;
+        }
     }
 
     function _isValidQuestion(q, sectionHint) {
@@ -561,62 +476,60 @@ const AI_JFT_SIM = (() => {
         if (!Array.isArray(q.options) || q.options.length !== 4) return false;
         if (!q.options.every(o => typeof o === 'string' && o.trim())) return false;
         if (typeof q.answer !== 'string' || !q.options.includes(q.answer)) return false;
+
+        // Explanation: wajib string — fallback ke '' jika undefined (jangan reject)
+        if (q.explanation === undefined || q.explanation === null) q.explanation = '';
         if (typeof q.explanation !== 'string') return false;
 
-        // Choukai: sanitize listeningScript — strip kalau rusak, jangan reject seluruh soal
+        // Duplicate options check: reject soal dengan opsi ganda
+        const uniq = new Set(q.options.map(o => o.trim().toLowerCase()));
+        if (uniq.size < 4) return false;
+
+        // Choukai: sanitize listeningScript — strip yg rusak, jangan reject soal
         if (q.listeningScript !== undefined) {
             if (!Array.isArray(q.listeningScript) || !q.listeningScript.length) {
                 delete q.listeningScript;
             } else {
                 q.listeningScript = q.listeningScript.filter(
-                    function(l) { return l && typeof l.text === 'string' && l.text.trim(); }
+                    l => l && typeof l.text === 'string' && l.text.trim()
                 );
                 if (!q.listeningScript.length) delete q.listeningScript;
             }
         }
 
-        // Anti-leak TIPE 3: opsi tidak boleh identik dengan kanji target
+        // Anti-leak TIPE 3: opsi identik dengan kanji target
         const target = _extractKanjiTarget(q.question);
-        if (target && q.options.some(function(o) { return o.trim() === target; })) return false;
+        if (target && q.options.some(o => o.trim() === target)) return false;
 
-        // Dokkai: jawaban harga/jam/angka wajib ada di teks bacaan
+        // Dokkai: jawaban harga/jam wajib ada di teks bacaan
         if (sectionHint === 'dokkai') {
-            var ans = q.answer.trim();
-            var isFact = /[0-9０-９]+[円時分日月]/.test(ans);
-            if (isFact && q.question.indexOf(ans) === -1) return false;
+            const ans = q.answer.trim();
+            if (/[0-9０-９]+[円時分日月]/.test(ans) && q.question.indexOf(ans) === -1) return false;
         }
 
         return true;
     }
     function _parseAndValidate(raw) {
         const parsed = _extractJSON(raw);
-        if (!parsed || typeof parsed !== 'object') {
-            console.error('[AI_JFT_SIM] _extractJSON gagal parse JSON');
-            return null;
-        }
+        if (!parsed || typeof parsed !== 'object') return null;
 
-        // Support struktur { sections: {...} } ATAU { kanji_kotoba: [...], ... }
         const src = (parsed.sections && typeof parsed.sections === 'object') ? parsed.sections : parsed;
-
         const out = {};
+        // Shuffle options agar jawaban tidak selalu di posisi pertama
+        function shuffleQ(q) {
+            var o=q.options.slice();
+            for(var i=o.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=o[i];o[i]=o[j];o[j]=t;}
+            q.options=o; return q;
+        }
         let totalValid = 0;
-        const secReport = {};
         for (const sec of SECTION_ORDER) {
             const arr   = Array.isArray(src[sec]) ? src[sec] : [];
-            const valid = arr.filter(q => _isValidQuestion(q, sec));
-            out[sec]         = valid;
-            totalValid      += valid.length;
-            secReport[sec]   = valid.length + '/' + arr.length;
+            const valid = arr.filter(q => _isValidQuestion(q, sec)).map(shuffleQ);
+            out[sec] = valid;
+            totalValid += valid.length;
         }
-        console.debug('[AI_JFT_SIM] validasi soal per section:', secReport, '| total valid:', totalValid);
-
-        // Tolak hanya jika benar-benar tidak ada soal sama sekali
+        console.debug('[AI_JFT_SIM] soal valid:', Object.fromEntries(SECTION_ORDER.map(s=>[s,out[s].length])));
         if (totalValid === 0) return null;
-
-        // Pastikan minimal 1 section punya soal
-        const sectionsWithData = SECTION_ORDER.filter(sec => out[sec].length > 0);
-        if (sectionsWithData.length === 0) return null;
-
         return out;
     }
 
@@ -641,7 +554,6 @@ const AI_JFT_SIM = (() => {
                 model: MODEL,
                 max_tokens: cfg.maxTokens,
                 temperature: 0.7,
-                // JSON mode: paksa gpt-4o-mini output valid JSON selalu
                 response_format: { type: 'json_object' },
                 messages: [
                     { role: 'system', content: prompt.system },
@@ -673,18 +585,8 @@ const AI_JFT_SIM = (() => {
             const raw = data?.choices?.[0]?.message?.content;
             if (!raw) throw new Error('Respon AI kosong. Coba lagi.');
 
-            // Debug log — tampilkan awal dan akhir respons AI
-            const _rawLen = (raw || '').length;
-            console.debug('[AI_JFT_SIM] raw AI response — length:', _rawLen,
-                '\nFirst 300:', (raw || '').slice(0, 300),
-                '\nLast 100:', (raw || '').slice(-100));
-
             const sections = _parseAndValidate(raw);
-            if (!sections) {
-                // Log lebih detail untuk debugging
-                console.error('[AI_JFT_SIM] _parseAndValidate GAGAL. Raw length:', raw?.length, '| First 200:', (raw || '').slice(0, 200));
-                throw new Error('Format soal dari AI tidak valid. Coba lagi.');
-            }
+            if (!sections) throw new Error('Format soal dari AI tidak valid. Coba lagi.');
 
             // ── Generate berhasil → simpan ke Firestore dulu, BARU potong credit ──
             const ref = _sessionsRef();
@@ -865,16 +767,20 @@ const AI_JFT_SIM = (() => {
     }
 
     function _renderTimerHero() {
-        // Inject ke PARENT aijs-session-body agar tidak dihapus body.innerHTML
-        if (document.getElementById('aijs-timer-hero')) {
-            _syncTimerHero();
-            return;
-        }
+        // Timer hero: block di atas soal, update bersama _updateTimerDisplay
         const body = document.getElementById('aijs-session-body');
         if (!body) return;
+        // Hanya inject sekali; jika sudah ada skip
+        if (document.getElementById('aijs-timer-hero')) return;
         const hero = document.createElement('div');
         hero.id = 'aijs-timer-hero';
         hero.className = 'aijs-timer-hero';
+        const s = _activeSession;
+        const totalSections = SECTION_ORDER.filter(sec => (s.sections[sec]||[]).length > 0).length;
+        const flat = s.flat[s.currentIndex] || {};
+        const secLabel = SECTION_LABELS[flat.section] || '—';
+        const secIndex = SECTION_ORDER.filter(sec => (s.sections[sec]||[]).length > 0)
+                                      .indexOf(flat.section) + 1;
         hero.innerHTML =
             '<div class="aijs-timer-hero-time" id="aijs-timer-hero-time">—</div>' +
             '<div class="aijs-timer-hero-label">WAKTU TERSISA</div>' +
@@ -887,17 +793,14 @@ const AI_JFT_SIM = (() => {
     function _syncTimerHero() {
         const el = document.getElementById('aijs-timer-hero-time');
         if (!el) return;
-        const m  = Math.floor(_timerRemaining / 60);
-        const sc = _timerRemaining % 60;
+        const m = Math.floor(_timerRemaining / 60), sc = _timerRemaining % 60;
         el.textContent = m + ':' + String(sc).padStart(2, '0');
         el.classList.toggle('aijs-timer-hero-warning', _timerRemaining <= 60);
-        // Update section label tiap soal
-        const s = _activeSession;
-        if (!s) return;
+        const s = _activeSession; if (!s) return;
         const flat = s.flat[s.currentIndex] || {};
-        const secLabel  = SECTION_LABELS[flat.section] || '—';
+        const secLabel = SECTION_LABELS[flat.section] || '—';
         const activeSecs = SECTION_ORDER.filter(sec => (s.sections[sec]||[]).length > 0);
-        const secIndex  = activeSecs.indexOf(flat.section) + 1;
+        const secIndex = activeSecs.indexOf(flat.section) + 1;
         const secEl = document.getElementById('aijs-timer-hero-section');
         const posEl = document.getElementById('aijs-timer-hero-pos');
         if (secEl) secEl.textContent = secLabel;
@@ -953,71 +856,40 @@ const AI_JFT_SIM = (() => {
             '<button class="aijs-option-btn" data-idx="' + i + '">' + escHTML(opt) + '</button>'
         ).join('');
 
-        // Choukai: routing ke flow audio
-        if (section === 'choukai') {
-            body.innerHTML = '';
-            _renderChoukaiQuestion(body, q);
-            return;
-        }
-
+        if (section === 'choukai') { body.innerHTML = ''; _renderChoukaiQuestion(body, q); return; }
         const imgBlock = _renderImageBlock(q);
-
         body.innerHTML =
             (imgBlock ? '<div class="aijs-q-visual">' + imgBlock + '</div>' : '') +
             '<div class="aijs-q-card"><div class="aijs-q-text">' + _renderText(q.question) + '</div></div>' +
-            '<div class="aijs-option-list" id="aijs-option-list">' + optionsHtml + '</div>' +
-            '<div id="aijs-feedback-slot"></div>';
-
-        document.querySelectorAll('#aijs-option-list .aijs-option-btn').forEach(btn => {
-            btn.addEventListener('click', () => _selectOption(parseInt(btn.dataset.idx, 10)));
+            '<div class="aijs-option-list" id="aijs-option-list">' +
+            q.options.map((opt,i)=>'<button class="aijs-option-btn" data-idx="'+i+'">'+_renderText(opt)+'</button>').join('') +
+            '</div><div id="aijs-feedback-slot"></div>';
+        document.querySelectorAll('#aijs-option-list .aijs-option-btn').forEach(btn=>{
+            btn.addEventListener('click',()=>_selectOption(parseInt(btn.dataset.idx,10)));
         });
         _bindImageFallbacks(body);
     }
 
-
-    // ── CHOUKAI AUDIO FLOW ─────────────────────────────────────────────
+    // ── CHOUKAI AUDIO FLOW ─────────────────────────────────────────
     function _renderChoukaiQuestion(body, q) {
-        const warn     = _TTS.warningHtml();
+        const warn = _TTS.warningHtml();
         const hasAudio = !warn && Array.isArray(q.listeningScript) && q.listeningScript.length;
-        const maxPlay  = (typeof q.maxPlay === 'number' && q.maxPlay >= 1) ? q.maxPlay : 2;
-        const playLabel = maxPlay > 1 ? '(maks ' + maxPlay + 'x)' : '(1x)';
 
-        // Tampilkan pertanyaan + tombol play — options tersembunyi sampai audio selesai
+        const maxPlay = (typeof q.maxPlay==='number'&&q.maxPlay>=1)?q.maxPlay:2;
         body.innerHTML =
-            '<div class="aijs-choukai-wrap">' +
-            warn +
+            '<div class="aijs-choukai-wrap">' + warn +
             '<div class="aijs-q-card"><div class="aijs-choukai-question-text">' + _renderText(q.question) + '</div></div>' +
             '<div class="aijs-choukai-player" id="aijs-choukai-player">' +
             (hasAudio
-                ? '<div class="aijs-choukai-play-area">' +
-                  '<button class="aijs-play-btn" id="aijs-play-btn">' +
-                  '<span class="aijs-play-icon">&#9654;</span> Putar Audio <span class="aijs-play-hint">' + escHTML(playLabel) + '</span>' +
-                  '</button>' +
-                  '<p class="aijs-choukai-hint">Tekan tombol, dengarkan, lalu pilih jawaban.</p>' +
-                  '</div>'
-                : '<p class="aijs-choukai-noscript">Suara bahasa Jepang tidak tersedia — teks dialog ditampilkan langsung.</p>') +
-            '</div>' +
-            '<div id="aijs-choukai-options-slot"></div>' +
-            '<div id="aijs-feedback-slot"></div>' +
-            '</div>';
-
+                ? '<div class="aijs-choukai-play-area"><button class="aijs-play-btn" id="aijs-play-btn">&#9654; Putar Audio <span class="aijs-play-hint">(maks '+maxPlay+'x)</span></button><p class="aijs-choukai-hint">Dengarkan lalu pilih jawaban.</p></div>'
+                : '<p class="aijs-choukai-noscript">Suara tidak tersedia — teks ditampilkan langsung.</p>') +
+            '</div><div id="aijs-choukai-options-slot"></div><div id="aijs-feedback-slot"></div></div>';
         if (hasAudio) {
-            let playCount = 0;
-            const playBtn = document.getElementById('aijs-play-btn');
-            if (!playBtn) return;
-            playBtn.addEventListener('click', function onClick() {
-                if (playCount >= maxPlay) return;
-                playBtn.disabled = true;
-                playBtn.innerHTML = '<span class="aijs-play-icon">&#9646;&#9646;</span> Sedang memutar...';
-                _TTS.speak(q.listeningScript, () => {
-                    playCount++;
-                    _revealChoukaiOptions(q, playCount, maxPlay);
-                });
+            let pc=0; const pb=document.getElementById('aijs-play-btn'); if(!pb)return;
+            pb.addEventListener('click',function(){ if(pc>=maxPlay)return; pb.disabled=true; pb.innerHTML='&#9646;&#9646; Memutar...';
+                _TTS.speak(q.listeningScript,()=>{pc++;_revealChoukaiOptions(q,pc,maxPlay);});
             });
-        } else {
-            _showChoukaiScript(q);
-            _revealChoukaiOptions(q, 1, 1);
-        }
+        } else { _showChoukaiScript(q); _revealChoukaiOptions(q,1,1); }
     }
 
     function _showChoukaiScript(q) {
@@ -1033,45 +905,50 @@ const AI_JFT_SIM = (() => {
     }
 
     function _revealChoukaiOptions(q, playCount, maxPlay) {
-        // playCount: sudah berapa kali diputar, maxPlay: batas maksimum
-        playCount = playCount || 1;
-        maxPlay   = maxPlay   || 2;
+        playCount = playCount||1; maxPlay = maxPlay||2;
+        const spinner = document.getElementById('aijs-choukai-spinner');
+        if (spinner) spinner.remove();
 
-        // Update area player: tampilkan script + tombol replay jika masih bisa
+        // Show script after audio done
         const player = document.getElementById('aijs-choukai-player');
         if (player && Array.isArray(q.listeningScript)) {
             const lines = q.listeningScript.map(l => {
-                const icon = l.speaker === 'male' ? '&#128104;' : '&#128105;';
+                const icon = l.speaker === 'male' ? '👨' : '👩';
                 return '<div class="aijs-script-line aijs-script-' + escHTML(l.speaker || 'female') + '">' +
                        '<span class="aijs-script-icon">' + icon + '</span>' +
                        '<span class="aijs-script-text">' + _renderText(l.text || '') + '</span></div>';
             }).join('');
-
-            const canReplay = _TTS.ALLOW_REPLAY && _TTS._hasJpVoice() && playCount < maxPlay;
-            player.innerHTML =
-                '<div class="aijs-script-box">' + lines + '</div>' +
-                (canReplay
-                    ? '<button class="aijs-replay-btn" id="aijs-replay-btn">' +
-                      '&#9654; Putar Ulang <span class="aijs-play-hint">(' + playCount + '/' + maxPlay + 'x)</span>' +
-                      '</button>'
-                    : (playCount >= maxPlay
-                        ? '<p class="aijs-replay-done">&#128263; Batas putar tercapai (' + maxPlay + 'x).</p>'
-                        : ''));
-
+            player.innerHTML = '<div class="aijs-script-box">' + lines + '</div>' +
+                (_TTS.ALLOW_REPLAY && _TTS._hasJpVoice() && Array.isArray(q.listeningScript) && (q.maxPlay || 2) > 1
+                    ? '<button class="aijs-replay-btn" id="aijs-replay-btn">🔁 Putar Ulang</button>'
+                    : '');
             const replayBtn = document.getElementById('aijs-replay-btn');
             if (replayBtn) {
+                // maxPlay: 1 = sekali saja, 2 = boleh ulang (default JFT: 2)
+                const maxPlay  = (typeof q.maxPlay === 'number') ? q.maxPlay : 2;
+                let   playCount = 1; // sudah diputar sekali otomatis
+                const updateReplayBtn = () => {
+                    if (playCount >= maxPlay) {
+                        replayBtn.disabled = true;
+                        replayBtn.textContent = '🔇 Batas putar tercapai';
+                    }
+                };
                 replayBtn.addEventListener('click', () => {
+                    if (playCount >= maxPlay) return;
                     replayBtn.disabled = true;
-                    replayBtn.innerHTML = '&#9646;&#9646; Memutar...';
+                    replayBtn.textContent = '⏸ Memutar...';
                     _TTS.speak(q.listeningScript, () => {
-                        const newCount = playCount + 1;
-                        _revealChoukaiOptions(q, newCount, maxPlay);
+                        playCount++;
+                        replayBtn.disabled = false;
+                        replayBtn.textContent = '🔁 Putar Ulang (' + playCount + '/' + maxPlay + ')';
+                        updateReplayBtn();
                     });
                 });
+                replayBtn.textContent = '🔁 Putar Ulang (1/' + maxPlay + ')';
+                updateReplayBtn();
             }
         }
 
-        // Tampilkan pilihan jawaban
         const slot = document.getElementById('aijs-choukai-options-slot');
         if (!slot) return;
         const optionsHtml = q.options.map((opt, i) =>
@@ -1082,6 +959,7 @@ const AI_JFT_SIM = (() => {
             btn.addEventListener('click', () => _selectOption(parseInt(btn.dataset.idx, 10)));
         });
     }
+
     function _selectOption(optionIndex) {
         const s = _activeSession;
         if (!s || s.answered) return;
