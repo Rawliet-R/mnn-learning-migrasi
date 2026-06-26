@@ -99,7 +99,7 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  const { messages, model = 'google/gemini-2.0-flash-001' } = payload || {};
+  const { messages, model = 'anthropic/claude-3-5-haiku', max_tokens = 3000, response_format, temperature } = payload || {};
   if (!messages || !Array.isArray(messages)) {
     res.status(400).json({ error: 'Field "messages" diperlukan.' });
     return;
@@ -119,7 +119,11 @@ module.exports = async function handler(req, res) {
         'HTTP-Referer': referer,
         'X-Title': 'MNN Learning - AI Sensei',
       },
-      body: JSON.stringify({ model, max_tokens: 900, messages }),
+      body: JSON.stringify(Object.assign(
+        { model, max_tokens, messages },
+        response_format ? { response_format } : {},
+        temperature !== undefined ? { temperature } : {}
+      )),
     });
 
     const data = await orRes.json();

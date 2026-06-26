@@ -479,6 +479,7 @@ const AI_JFT_SIM = (() => {
 
         // Explanation: wajib string — fallback ke '' jika undefined (jangan reject)
         if (q.explanation === undefined || q.explanation === null) q.explanation = '';
+        if (q.explanation === undefined || q.explanation === null) q.explanation = '';
         if (typeof q.explanation !== 'string') return false;
 
         // Duplicate options check: reject soal dengan opsi ganda
@@ -498,7 +499,9 @@ const AI_JFT_SIM = (() => {
         }
 
         // Anti-leak TIPE 3: opsi identik dengan kanji target
-        const target = _extractKanjiTarget(q.question);
+        // Inline target extraction — avoid 'not defined' error
+        const _m = q.question.match(/【([^】]+)】/);
+        const target = _m ? _m[1] : null;
         if (target && q.options.some(o => o.trim() === target)) return false;
 
         // Dokkai: jawaban harga/jam wajib ada di teks bacaan
@@ -554,7 +557,6 @@ const AI_JFT_SIM = (() => {
                 model: MODEL,
                 max_tokens: cfg.maxTokens,
                 temperature: 0.7,
-                response_format: { type: 'json_object' },
                 messages: [
                     { role: 'system', content: prompt.system },
                     { role: 'user',   content: prompt.user },
