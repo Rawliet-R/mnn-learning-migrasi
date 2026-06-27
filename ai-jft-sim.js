@@ -481,48 +481,63 @@ const AI_JFT_SIM = (() => {
 
     function _isValidQuestion(q, sectionHint) {
         if (!q || typeof q.question !== 'string') return false;
-        const _qt = q.question.trim();
-        // Tolak: kosong, terlalu pendek, atau hanya blank marker
-        if (!_qt || _qt.length < 4) return false;
-        if (/^[（）　・\s]+$/.test(_qt)) return false; // hanya （　）
+        var qt = q.question.trim();
+        if (!qt || qt.length < 3) return false;
         if (!Array.isArray(q.options) || q.options.length !== 4) return false;
-        if (!q.options.every(o => typeof o === 'string' && o.trim())) return false;
+        if (!q.options.every(function(o){ return typeof o === 'string' && o.trim(); })) return false;
         if (typeof q.answer !== 'string') return false;
-        // Normalize: trim + collapse spaces untuk toleransi variasi AI output
-        const _norm = s => String(s).trim().replace(/\s+/g, ' ');
-        const _normAns = _norm(q.answer);
-        const _matched = q.options.find(o => _norm(o) === _normAns);
-        if (!_matched) return false;
-        q.answer = _matched; // fix ke versi exact dari options
-
-        // Explanation: wajib string — fallback ke '' jika undefined (jangan reject)
-        if (q.explanation === undefined || q.explanation === null) q.explanation = '';
-        if (q.explanation === undefined || q.explanation === null) q.explanation = '';
+        if (q.explanation == null) q.explanation = '';
         if (typeof q.explanation !== 'string') return false;
 
-        // Duplicate options check: reject soal dengan opsi ganda
-        const uniq = new Set(q.options.map(o => o.trim().toLowerCase()));
+        // ── DOKKAI: validasi ultra-lenient ─────────────────────────────
+        if (sectionHint === 'dokkai') {
+            var _dc = function(s) {
+                return String(s).trim()
+                    .replace(/[\u3000\u00a0 ]+/g, '')
+                    .replace(/[\u3002\u3001\uff1f\uff01\.\?!,]/g, '')
+                    .toLowerCase();
+            };
+            var dcAns = _dc(q.answer);
+            var dcMatch = q.options.find(function(o){ return _dc(o) === dcAns; });
+            if (!dcMatch) {
+                dcMatch = q.options.find(function(o){
+                    var co = _dc(o);
+                    return co.indexOf(dcAns) !== -1 || dcAns.indexOf(co) !== -1;
+                });
+            }
+            if (!dcMatch) {
+                console.warn('[DOKKAI rejected] answer not in opts:', q.answer, q.options);
+                return false;
+            }
+            q.answer = dcMatch;
+            if (q.listeningScript !== undefined) delete q.listeningScript;
+            return true;
+        }
+
+        // ── SEMUA SECTION LAIN ─────────────────────────────────────────
+        var _norm = function(s){ return String(s).trim().replace(/[\s\u3000]+/g,' '); };
+        var normAns = _norm(q.answer);
+        var matched = q.options.find(function(o){ return _norm(o) === normAns; });
+        if (!matched) return false;
+        q.answer = matched;
+
+        var uniq = new Set(q.options.map(function(o){ return o.trim().toLowerCase(); }));
         if (uniq.size < 4) return false;
 
-        // Choukai: sanitize listeningScript — strip yg rusak, jangan reject soal
         if (q.listeningScript !== undefined) {
             if (!Array.isArray(q.listeningScript) || !q.listeningScript.length) {
                 delete q.listeningScript;
             } else {
                 q.listeningScript = q.listeningScript.filter(
-                    l => l && typeof l.text === 'string' && l.text.trim()
+                    function(l){ return l && typeof l.text === 'string' && l.text.trim(); }
                 );
                 if (!q.listeningScript.length) delete q.listeningScript;
             }
         }
 
-        // Anti-leak TIPE 3: opsi identik dengan kanji target
-        // Inline target extraction — avoid 'not defined' error
-        const _m = q.question.match(/【([^】]+)】/);
-        const target = _m ? _m[1] : null;
-        if (target && q.options.some(o => o.trim() === target)) return false;
-
-        // Dokkai: validasi struktur saja (factcheck dihapus — terlalu ketat)
+        var _km = qt.match(/\u3010([^\u3011]+)\u3011/);
+        var target = _km ? _km[1] : null;
+        if (target && q.options.some(function(o){ return o.trim() === target; })) return false;
 
         return true;
     }
