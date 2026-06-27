@@ -429,9 +429,17 @@ const AI_JFT_SIM = (() => {
             'TIPE 3 Kanji Reading: [漢字]→4 cara baca HIRAGANA kata ITU. BUKAN kata lain!\n' +
             '  BENAR: Q="[電話]ボックス" Opts=["でんわ","てんわ","でいわ","とんわ"] A="でんわ"\n\n' +
             'TIPE 4 Kanji Meaning: (　)→pilih kanji. Opts=["乗って","光って","通って","走って"] A="光って"\n\n' +
-            '== EXPRESSION ==\n' +
-            'いらっしゃいませ=SELALU 店員→客. Tanya いくら？→HARGA(300円). Tanya 何時？→JAM(3時). Blank:(　　　).\n' +
-            'Options=ungkapan Jepang natural, relevan konteks dialog.\n\n' +
+            '== EXPRESSION ==\\n' +
+            'いらっしゃいませ=SELALU 店員→客. Tanya いくら？→HARGA(300円). Tanya 何時？→JAM(3時). Blank:(　　　).\\n' +
+            '!!! WAJIB: field "question" HARUS berisi DIALOG atau SITUASI dengan 1-2 kalimat + blank. BUKAN hanya pertanyaan kosong !!!\\n' +
+            '!!! DILARANG: "question": "(　　　)" saja — HARUS ada konteks dialog !!!\\n' +
+            'Format WAJIB: "A: [kalimat]\\nB: (　　　)" atau "[situasi]. (　　　)"\\n' +
+            'BENAR: Q="店員：いらっしゃいませ！\\n客：(　　　)" Opts=["ありがとうございます","すみません","いいです","どうぞ"]\\n' +
+            'BENAR: Q="上司に仕事が終わったことを伝えたい。(　　　)" Opts=["お疲れ様でした","起きます","いきます","説明します"]\\n' +
+            'SALAH: Q="(　　　)" saja — tidak ada konteks!\\n' +
+            'SALAH: Q="いくらですか？" → ini pertanyaan, BUKAN dialog dengan blank!\\n' +
+            'Options=ungkapan Jepang natural, relevan konteks dialog.\\n\\n' +
+
             '== CHOUKAI ==\n' +
             'WAJIB: "listeningScript":[{"speaker":"male"|"female","text":"..."},...], "maxPlay":1|2.\n' +
             '"question"=kalimat tanya SINGKAT (bukan isi script, tanpa \\n).\n' +
@@ -472,10 +480,20 @@ const AI_JFT_SIM = (() => {
     }
 
     function _isValidQuestion(q, sectionHint) {
-        if (!q || typeof q.question !== 'string' || !q.question.trim()) return false;
+        if (!q || typeof q.question !== 'string') return false;
+        const _qt = q.question.trim();
+        // Tolak: kosong, terlalu pendek, atau hanya blank marker
+        if (!_qt || _qt.length < 4) return false;
+        if (/^[（）　・\s]+$/.test(_qt)) return false; // hanya （　）
         if (!Array.isArray(q.options) || q.options.length !== 4) return false;
         if (!q.options.every(o => typeof o === 'string' && o.trim())) return false;
-        if (typeof q.answer !== 'string' || !q.options.includes(q.answer)) return false;
+        if (typeof q.answer !== 'string') return false;
+        // Normalize: trim + collapse spaces untuk toleransi variasi AI output
+        const _norm = s => String(s).trim().replace(/\s+/g, ' ');
+        const _normAns = _norm(q.answer);
+        const _matched = q.options.find(o => _norm(o) === _normAns);
+        if (!_matched) return false;
+        q.answer = _matched; // fix ke versi exact dari options
 
         // Explanation: wajib string — fallback ke '' jika undefined (jangan reject)
         if (q.explanation === undefined || q.explanation === null) q.explanation = '';
@@ -504,15 +522,7 @@ const AI_JFT_SIM = (() => {
         const target = _m ? _m[1] : null;
         if (target && q.options.some(o => o.trim() === target)) return false;
 
-        // Dokkai: factcheck lenient — cek digit utama ada di teks (bukan exact match)
-        if (sectionHint === 'dokkai') {
-            const ans = q.answer.trim();
-            const numMatch = ans.match(/[0-9０-９]+/);
-            if (numMatch && /[0-9０-９]+[円時分日月]/.test(ans)) {
-                // Cek hanya angkanya ada di teks (bukan exact string match)
-                if (!q.question.includes(numMatch[0])) return false;
-            }
-        }
+        // Dokkai: validasi struktur saja (factcheck dihapus — terlalu ketat)
 
         return true;
     }
