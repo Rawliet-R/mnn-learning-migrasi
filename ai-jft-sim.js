@@ -1,1217 +1,999 @@
-/* ═══════════════════════════════════════════════════════════
-   MNN Learning — 🤖 AI JFT Simulation
-   ai-jft-sim.js — Phase 1
-
-   TUJUAN:
-   Simulasi JFT yang soalnya dibuat otomatis oleh AI, SATU KALI
-   per sesi (bukan per soal). Setelah soal dibuat, user mengerjakan
-   sepenuhnya offline-dari-AI (tidak ada panggilan AI susulan).
-
-   TIDAK MENGUBAH:
-   - ai-sensei.js / ai-sensei-flag.js / ai-sensei-credit.js / dst.
-     (file ini hanya MEMAKAI fungsi publik AI_SENSEI.getCredits()
-      dan AI_SENSEI.deductCredit() — tidak pernah menulis ke
-      ai-sensei.js ataupun mengubah logikanya)
-   - exam_engine_v9.js / jft_simulation.js (JFT Basic Full Simulation
-     yang sudah ada tetap 100% terpisah dan tidak tersentuh)
-   - Sistem credit AI Sensei (aiCredits di users/{uid}) — DIPAKAI
-     BERSAMA, bukan dibuat ulang. Lihat catatan asumsi di README/chat.
-
-   FIRESTORE SCHEMA (baru):
-   users/{uid}/aiJftSessions/{sessionId}
-   {
-     sessionId, level, mode, createdAt, creditCost,
-     score: null|number, completed: boolean,
-     sectionScores: { kanji_kotoba:{correct,total}, expression:{...}, dokkai:{...} },
-     questions: { kanji_kotoba:[...], expression:[...], dokkai:[...] }
-   }
-
-   FEATURE FLAG:
-   Dikontrol oleh AI_JFT_FLAG (ai-jft-sim-flag.js) — field
-   config/appSettings.aiJftSimulationEnabled. Akses halaman setup
-   sudah dicek oleh navigateTo() di app.js SEBELUM modul ini dipanggil;
-   modul ini sendiri tidak mengulang pengecekan flag (hanya AI_FLAG-style
-   admin test mode yang relevan ada di AI_JFT_FLAG).
-
-   PHASE 1 — HANYA:
-   1. Kanji & Kotoba   2. Expression   3. Dokkai
-   (Choukai & AI Analysis SENGAJA belum diimplementasikan)
-   ═══════════════════════════════════════════════════════════ */
-
-'use strict';
+// ═══════════════════════════════════════════════════════════════════
+//  MNN Learning — AI JFT Simulation  (REBUILT v4.0)
+//  Rawliet.ID / FrameProject
+//
+//  Arsitektur bersih — tidak ada akumulasi bug dari versi sebelumnya.
+//  Model: anthropic/claude-3-5-haiku (lebih patuh instruksi JSON)
+//  Generation: DUA API call terpisah (text + choukai) → tidak ada truncation
+// ═══════════════════════════════════════════════════════════════════
 
 const AI_JFT_SIM = (() => {
+'use strict';
 
-    // ─────────────────────────────────────────────────────
-    // KONSTANTA
-    // ─────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────────────────────────
+const MODEL = 'anthropic/claude-3-5-haiku';
 
-    // Model khusus untuk generate soal terstruktur — cepat & murah,
-    // SENGAJA dipisah dari model AI Sensei (openai/gpt-4o-mini).
-    // Ini adalah model default yang sudah ada di api/ai-proxy.js
-    // & netlify/functions/ai-proxy.js saat field "model" tidak dikirim,
-    // di sini dikirim eksplisit agar jelas di kode.
-    const MODEL = 'openai/gpt-4o-mini';
+const SECTION_ORDER  = ['kanji_kotoba','expression','choukai','dokkai'];
 
-    const LEVELS = {
-        n5:        'A1 Pemula',
-        n4:        'A2 Awal Kerja',
-        jft_basic: 'A2+ Siap Kerja',
-    };
+const LEVELS = { n5: 'N5', n4: 'N4' };
 
-    // Pembagian soal per section (kanji_kotoba/expression/dokkai) adalah
-    // DEFAULT yang bisa disesuaikan kapan saja — total soal & credit cost
-    // mengikuti spesifikasi persis dari permintaan awal.
-    const MODES = {
-        easy:   { label: 'Easy',   totalSoal: 10, credit: 5,  maxTokens: 4500, timerSeconds: 900,  sections: { kanji_kotoba: 3,  expression: 2,  choukai: 2,  dokkai: 3  } },
-        normal: { label: 'Normal', totalSoal: 20, credit: 10, maxTokens: 7500, timerSeconds: 1800, sections: { kanji_kotoba: 6,  expression: 5,  choukai: 4,  dokkai: 5  } },
-        full:   { label: 'Full',   totalSoal: 40, credit: 20, maxTokens: 13000, timerSeconds: 3600, sections: { kanji_kotoba: 12, expression: 10, choukai: 8,  dokkai: 10 } },
-    };
+const MODES = {
+    easy:   { label:'Easy',   soal:10, credit:5,  timer:900,
+               sections:{ kanji_kotoba:3, expression:2, choukai:2, dokkai:3 } },
+    normal: { label:'Normal', soal:20, credit:10, timer:1800,
+               sections:{ kanji_kotoba:5, expression:4, choukai:5, dokkai:6 } },
+    full:   { label:'Full',   soal:40, credit:20, timer:3600,
+               sections:{ kanji_kotoba:10, expression:8, choukai:10, dokkai:12 } },
+};
 
-    const SECTION_ORDER  = ['kanji_kotoba', 'expression', 'choukai', 'dokkai'];
-    const SECTION_LABELS = {
-        kanji_kotoba: '📚 Kanji & Kotoba',
-        expression:   '💬 Expression',
-        dokkai:       '📖 Dokkai',
-        choukai:      '🎧 Choukai',
-    };
+const SEC_LABEL = {
+    kanji_kotoba:'📖 Kanji & Kotoba',
+    expression:  '💬 Expression',
+    choukai:     '🎧 Choukai',
+    dokkai:      '📄 Dokkai',
+};
 
-    // Render text: escape HTML + convert \n literals to <br>
-    function _renderText(str) {
-        if (!str) return '';
-        var e = String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-        return e.replace(/\\n/g,'<br>').replace(/\n/g,'<br>');
+// ─────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────
+let _S   = null;   // active session
+let _tid = null;   // timer interval id
+
+// ─────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────
+function esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function renderText(s) {
+    if (!s) return '';
+    var e = esc(s);
+    // literal \n (two chars) or actual newline → <br>
+    return e.replace(/\\n/g,'<br>').replace(/\n/g,'<br>');
+}
+
+function renderKanjiQuestion(q) {
+    // Kanji Reading: underline the highlighted kanji word in question
+    var hl = q.highlight ? esc(q.highlight) : null;
+    var txt = renderText(q.question);
+    if (hl) txt = txt.replace(hl, '<u style="text-decoration-color:#4f8ef7"><b>'+hl+'</b></u>');
+    return txt;
+}
+
+function fixJsonNewlines(str) {
+    var inStr=false, esc2=false, out='';
+    for (var i=0;i<str.length;i++) {
+        var c=str[i];
+        if (esc2){out+=c;esc2=false;continue;}
+        if (c==='\\'&&inStr){out+=c;esc2=true;continue;}
+        if (c==='"'){out+=c;inStr=!inStr;continue;}
+        if (inStr&&c==='\n'){out+='\\n';continue;}
+        if (inStr&&c==='\r'){continue;}
+        out+=c;
     }
+    return out;
+}
 
-    // ─────────────────────────────────────────────────────
-    // STATE (in-memory, hilang saat reload — lihat catatan di chat)
-    // ─────────────────────────────────────────────────────
-    let _selectedLevel   = null;
-    let _selectedMode    = null;
-    let _generating       = false;
-    let _sessionLoading   = false; // true saat retrySession() sedang fetch dari Firestore
-    let _activeSession   = null;  // lihat _buildActiveSession()
-    let _creditsSnapshot = null;  // snapshot tampilan saldo di halaman setup (bukan untuk validasi)
+function extractJSON(text) {
+    var t = String(text||'').trim()
+        .replace(/^```json\s*/i,'').replace(/^```\s*/i,'').replace(/```\s*$/i,'').trim();
+    var s=t.indexOf('{'), e=t.lastIndexOf('}');
+    if (s===-1||e===-1||e<=s) return null;
+    var c=t.slice(s,e+1);
+    try{return JSON.parse(c);}catch(_){}
+    try{return JSON.parse(fixJsonNewlines(c));}catch(_){}
+    return null;
+}
 
-    let _setupBound          = false;
-    let _sessionTopbarBound  = false;
+function norm(s){ return String(s||'').trim().replace(/\s+/g,' '); }
 
-    // ── Phase 2: Timer ──
-    let _timerInterval   = null;  // setInterval handle
-    let _timerRemaining  = 0;     // detik tersisa
-    let _sessionStartTs  = null;  // Date.now() saat sesi mulai (untuk durasi)
+// ─────────────────────────────────────────────────────────────────
+// VALIDATION
+// ─────────────────────────────────────────────────────────────────
+function validateQ(q, sec) {
+    if (!q || typeof q.question !== 'string') return false;
+    var qt = q.question.trim();
+    // Strip accidental Q="..." prefix from AI copying examples
+    qt = qt.replace(/^[Qq]\s*[:=]\s*["']/, '').replace(/["']\s*$/, '').trim();
+    if (qt) q.question = qt;
+    if (!qt || qt.length < 3) return false;
 
-    // ─────────────────────────────────────────────────────
-    // HELPERS — Firestore
-    // ─────────────────────────────────────────────────────
-    function _sessionsRef() {
-        const uid = window.AUTH?.user?.uid;
-        if (!uid || window.AUTH?.user?.isGuest || typeof _fbDb === 'undefined') return null;
-        return _fbDb.collection('users').doc(uid).collection('aiJftSessions');
-    }
+    if (!Array.isArray(q.options) || q.options.length !== 4) return false;
+    if (!q.options.every(function(o){ return typeof o==='string'&&o.trim(); })) return false;
+    if (typeof q.answer !== 'string') return false;
 
-    // V3: aiJftHistory — koleksi baru untuk riwayat paket ujian
-    // aiJftSessions tetap dipertahankan agar session lama tidak hilang.
-    function _historyRef() {
-        const uid = window.AUTH?.user?.uid;
-        if (!uid || window.AUTH?.user?.isGuest || typeof _fbDb === 'undefined') return null;
-        return _fbDb.collection('users').doc(uid).collection('aiJftHistory');
-    }
+    // Explanation fallback
+    if (q.explanation == null) q.explanation = '';
 
-    function _flattenSections(sections) {
-        const flat = [];
-        SECTION_ORDER.forEach(sec => {
-            (sections[sec] || []).forEach(q => flat.push({ section: sec, q }));
-        });
-        return flat;
-    }
-
-    function _buildActiveSession(sessionId, level, mode, creditCost, sections, existingAnswers, timerSeconds) {
-        return {
-            sessionId, level, mode, creditCost,
-            sections,                           // { kanji_kotoba:[...], expression:[...], dokkai:[...] }
-            flat: _flattenSections(sections),   // urutan tampil flat
-            currentIndex: 0,
-            answers: existingAnswers || [],     // [{section, selectedIndex, correct}]
-            answered: false,
-            timerSeconds: timerSeconds || 0,    // Phase 2: durasi timer mode ini
-        };
-    }
-
-    // ── IMAGE FRAMEWORK ───────────────────────────────────────────
-    // AI memilih imageId (mis. "restaurant_menu_01"), sistem load dari
-    // /assets/jft-images/{imageId}.jpg|.png. Tanpa refactor saat asset tersedia.
-    const IMAGE_ASSET_BASE = '/assets/jft-images/';
-    const IMAGE_EXTENSIONS = ['.jpg', '.png', '.webp'];
-
-    function _resolveImageAsset(imageId) {
-        if (!imageId) return null;
-        // Gunakan ekstensi pertama — saat ini placeholder; override saat asset ada
-        return IMAGE_ASSET_BASE + imageId + '.jpg';
-    }
-
-    function _renderImagePlaceholder(imageId) {
-        const label = imageId ? imageId.replace(/_/g, ' ') : 'Gambar';
-        return '<div class="aijs-img-placeholder"><div class="aijs-img-placeholder-icon">🖼️</div>' +
-               '<div class="aijs-img-placeholder-label">' + escHTML(label) + '</div>' +
-               '<div class="aijs-img-placeholder-hint">Asset belum tersedia</div></div>';
-    }
-
-    function _renderImageBlock(q) {
-        // Support both new imageId and legacy imageCategory/imageAsset
-        const imageId = q.imageId || null;
-        if (!imageId) return '';
-        const src = _resolveImageAsset(imageId);
-        return '<div class="aijs-img-wrap" data-imgid="' + escHTML(imageId) + '">' +
-               '<img class="aijs-img-asset" src="' + escHTML(src) +
-               '" alt="' + escHTML(imageId) + '" loading="lazy"></div>';
-    }
-
-    function _bindImageFallbacks(container) {
-        container.querySelectorAll('.aijs-img-asset').forEach(img => {
-            img.addEventListener('error', function() {
-                const wrap = this.closest('[data-imgid]');
-                const id   = wrap ? wrap.dataset.imgid : '';
-                if (wrap) wrap.outerHTML = _renderImagePlaceholder(id);
-            });
-        });
-    }
-
-    // ── Phase 2: CHOUKAI FOUNDATION ──────────────────────────────
-    // Struktur data choukai — belum ada TTS/audio, hanya fondasi.
-    // { listeningText: "...", audioUrl: null, maxPlay: 2 }
-    function _docTypeLabel(docType) {
-        const map = {
-            brosur:       '📄 Brosur',
-            poster:       '🗒️ Poster',
-            jadwal:       '🗓️ Jadwal',
-            pengumuman:   '📢 Pengumuman',
-            formulir:     '📋 Formulir',
-            email:        '📧 Email',
-            chat:         '💬 Chat',
-            papan_info:   '🪧 Papan Informasi',
-            teks_bebas:   '📖 Teks',
-        };
-        return map[docType] || ('📄 ' + docType);
-    }
-
-    function _renderChoukaiBadge(q) {
-        if (q.questionType !== 'choukai') return '';
-        return '<div class="aijs-choukai-badge">🎧 Choukai — Audio belum tersedia</div>';
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // TTS ENGINE — Browser SpeechSynthesis, ja-JP, multi-speaker
-    // ═══════════════════════════════════════════════════════════
-    const _TTS = {
-        ALLOW_REPLAY : true,   // false = audio hanya sekali (strict JFT mode)
-        _ready       : false,
-        _voices      : [],
-        _maleVoice   : null,
-        _femaleVoice : null,
-        _onDoneCb    : null,
-        _utterances  : [],
-
-        /** Inisialisasi voices. Dipanggil sekali lalu cache. */
-        init() {
-            if (!window.speechSynthesis) return;
-            const load = () => {
-                this._voices = window.speechSynthesis.getVoices();
-                this._pickVoices();
-                this._ready = true;
-            };
-            if (window.speechSynthesis.getVoices().length) {
-                load();
-            } else {
-                window.speechSynthesis.addEventListener('voiceschanged', load, { once: true });
-            }
-        },
-
-        _pickVoices() {
-            const jp = this._voices.filter(v => v.lang && v.lang.startsWith('ja'));
-            if (!jp.length) return;
-            // Female: default/pertama
-            this._femaleVoice = jp[0];
-            // Male: cari kata "male" atau "man" di name, atau ambil index ke-1 jika ada
-            const maleHint = jp.find(v => /male|man|otoko/i.test(v.name));
-            this._maleVoice = maleHint || (jp.length > 1 ? jp[1] : jp[0]);
-        },
-
-        _hasJpVoice() {
-            return !!(this._maleVoice || this._femaleVoice);
-        },
-
-        /**
-         * Mainkan array script: [{speaker:"male"|"female", text:"..."}]
-         * onDone dipanggil setelah semua utterance selesai.
-         */
-        speak(script, onDone) {
-            if (!window.speechSynthesis) { if (onDone) onDone(); return; }
-            window.speechSynthesis.cancel();
-            this._onDoneCb  = onDone;
-            this._utterances = [];
-
-            const lines = Array.isArray(script) ? script : [];
-            if (!lines.length) { if (onDone) onDone(); return; }
-
-            lines.forEach((line, i) => {
-                const utt  = new SpeechSynthesisUtterance(line.text || '');
-                utt.lang   = 'ja-JP';
-                utt.rate   = 0.88;
-                utt.pitch  = (line.speaker === 'male') ? 0.75 : 1.15;
-                const voice = (line.speaker === 'male') ? this._maleVoice : this._femaleVoice;
-                if (voice) utt.voice = voice;
-                if (i === lines.length - 1) {
-                    utt.onend = () => { if (this._onDoneCb) { this._onDoneCb(); this._onDoneCb = null; } };
-                    utt.onerror = () => { if (this._onDoneCb) { this._onDoneCb(); this._onDoneCb = null; } };
-                }
-                this._utterances.push(utt);
-            });
-
-            this._utterances.forEach(u => window.speechSynthesis.speak(u));
-        },
-
-        stop() {
-            if (window.speechSynthesis) window.speechSynthesis.cancel();
-            this._onDoneCb = null;
-        },
-
-        warningHtml() {
-            if (!window.speechSynthesis) {
-                return '<div class="aijs-tts-warn">⚠️ Browser tidak mendukung SpeechSynthesis. Choukai tidak tersedia.</div>';
-            }
-            if (!this._hasJpVoice()) {
-                return '<div class="aijs-tts-warn">⚠️ Suara bahasa Jepang tidak tersedia di perangkat ini. Teks dialog ditampilkan sebagai gantinya.</div>';
-            }
-            return '';
-        },
-    };
-    _TTS.init();
-
-    // ─────────────────────────────────────────────────────
-    // SETUP PAGE
-    // ─────────────────────────────────────────────────────
-
-    /**
-     * Render halaman setup (pilih level/mode + riwayat).
-     * Akses (feature flag) sudah dicek oleh navigateTo() di app.js
-     * sebelum fungsi ini dipanggil.
-     */
-    function renderSetupPage() {
-        _selectedLevel    = null;
-        _selectedMode     = null;
-        _creditsSnapshot  = null;
-
-        document.querySelectorAll('.aijs-level-btn').forEach(b => b.classList.remove('aijs-selected'));
-        document.querySelectorAll('.aijs-mode-btn').forEach(b => b.classList.remove('aijs-selected'));
-
-        _bindSetupEvents();
-        _updateStartButton();
-        loadHistory();
-
-        // Ambil snapshot saldo SEKALI per kunjungan halaman (bukan tiap tap tombol)
-        if (window.AI_SENSEI?.getCredits) {
-            AI_SENSEI.getCredits().then(c => {
-                _creditsSnapshot = c;
-                _updateStartButton();
-            }).catch(() => {});
-        }
-    }
-
-    function _bindSetupEvents() {
-        // Tombol level/mode bersifat statis di index.html (tidak di-render ulang),
-        // jadi listener cukup dipasang sekali agar tidak dobel saat halaman dibuka berkali-kali.
-        if (_setupBound) return;
-        _setupBound = true;
-
-        document.querySelectorAll('.aijs-level-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.aijs-level-btn').forEach(b => b.classList.remove('aijs-selected'));
-                btn.classList.add('aijs-selected');
-                _selectedLevel = btn.dataset.level;
-                _updateStartButton();
-            });
-        });
-
-        document.querySelectorAll('.aijs-mode-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.aijs-mode-btn').forEach(b => b.classList.remove('aijs-selected'));
-                btn.classList.add('aijs-selected');
-                _selectedMode = btn.dataset.mode;
-                _updateStartButton();
-            });
-        });
-
-        const startBtn = document.getElementById('aijs-start-btn');
-        if (startBtn) startBtn.addEventListener('click', startGeneration);
-    }
-
-    function _updateStartButton() {
-        const startBtn = document.getElementById('aijs-start-btn');
-        const info     = document.getElementById('aijs-start-credit-info');
-        if (!startBtn) return;
-
-        if (!_selectedLevel || !_selectedMode) {
-            startBtn.disabled = true;
-            if (info) info.textContent = 'Pilih level dan mode untuk memulai.';
-            return;
-        }
-
-        const cfg = MODES[_selectedMode];
-        startBtn.disabled = false;
-
-        if (info) {
-            const remaining = _creditsSnapshot ? (_creditsSnapshot.remaining ?? 0) : null;
-            info.innerHTML = remaining === null
-                ? 'Sesi ini membutuhkan <strong>' + cfg.credit + ' credit</strong>.'
-                : 'Sesi ini membutuhkan <strong>' + cfg.credit + ' credit</strong> · Sisa credit kamu: <strong>' + remaining + '</strong>';
-        }
-    }
-
-    // ─────────────────────────────────────────────────────
-    // GENERATE SESSION — AI dipanggil SATU KALI di sini
-    // ─────────────────────────────────────────────────────
-
-    async function startGeneration() {
-        if (_generating) return;
-        if (!_selectedLevel || !_selectedMode) return;
-
-        if (!window.AUTH?.user || window.AUTH?.user?.isGuest) {
-            if (typeof showLoginModal === 'function') showLoginModal();
-            return;
-        }
-        if (!window.AI_SENSEI?.getCredits || !window.AI_SENSEI?.deductCredit) {
-            _showGenerateErrorDialog('Sistem credit AI belum siap. Muat ulang aplikasi lalu coba lagi.');
-            return;
-        }
-
-        const cfg = MODES[_selectedMode];
-
-        // ── VALIDASI CREDIT (pengecekan otoritatif, terlepas dari snapshot tampilan) ──
-        let credits;
-        try {
-            credits = await AI_SENSEI.getCredits();
-        } catch (e) {
-            credits = { remaining: 0, error: true };
-        }
-
-        if (!credits || (credits.remaining ?? 0) < cfg.credit) {
-            _showInsufficientCreditDialog(cfg.credit, credits?.remaining ?? 0);
-            return;
-        }
-
-        await _generateSession(_selectedLevel, _selectedMode, cfg);
-    }
-
-    function _levelGuide(levelId) {
-        const g = {
-            a1:'A1 Pemula: kosakata SANGAT dasar. Kalimat max 10 kata. Kanji HANYA: 人日本水火木金土月山川大小中上下食飲見行来帰時間円店駅学校先生.',
-            a1plus:'A1+ Dasar: kosakata berkembang, partikel はがをにでの. Topik: belanja, transportasi.',
-            a2:'A2 Awal Kerja (JFT-Basic): format resmi JFT. Kosakata kerja.',
-            a2plus:'A2+ Siap Kerja: pengumuman resmi, formulir, instruksi kompleks.',
-            n5:'N5: dasar.', n4:'N4: menengah-dasar.', jft_basic:'JFT-Basic (CEFR A2).'
-        };
-        return g[levelId] || g.a2;
-    }
-
-    function _buildPrompt(levelId, cfg) {
-        const levelLabel = LEVELS[levelId] || levelId;
-        const levelGuide = _levelGuide(levelId);
-        const s = cfg.sections;
-        const system =
-            'Kamu adalah pembuat soal ujian JFT-Basic untuk MNN Learning. Balas HANYA JSON murni.\n\n' +
-            '== KANJI & KOTOBA (4 tipe merata) ==\n' +
-            'TIPE 1 Word Meaning: situasi singkat → pilih kata.\n' +
-            '  A1: Q="かおをあらいます。どこでしますか。" Opts=["おふろ","トイレ","だいどころ","しんしつ"] A="おふろ"\n\n' +
-            'TIPE 2 Word Usage: kalimat+(　)→pilih. GRAMMAR WAJIB:\n' +
-            '  +ます→stem(おき/ね) | +てきました→te(なれて) | +をします→nomina(散歩) | +です→adj(あまい)\n' +
-            '  BENAR: Q="毎日 6時に(　)ます。" Opts=["おき","ね","あらい","いき"] A="おき"\n\n' +
-            'TIPE 3 Kanji Reading: [漢字]→4 cara baca HIRAGANA kata ITU. BUKAN kata lain!\n' +
-            '  BENAR: Q="[電話]ボックス" Opts=["でんわ","てんわ","でいわ","とんわ"] A="でんわ"\n\n' +
-            'TIPE 4 Kanji Meaning: (　)→pilih kanji. Opts=["乗って","光って","通って","走って"] A="光って"\n\n' +
-            '== EXPRESSION ==\\n' +
-            'いらっしゃいませ=SELALU 店員→客. Tanya いくら？→HARGA(300円). Tanya 何時？→JAM(3時). Blank:(　　　).\\n' +
-            '!!! WAJIB: field "question" HARUS berisi DIALOG atau SITUASI dengan 1-2 kalimat + blank. BUKAN hanya pertanyaan kosong !!!\\n' +
-            '!!! DILARANG: "question": "(　　　)" saja — HARUS ada konteks dialog !!!\\n' +
-            'Format WAJIB: "A: [kalimat]\\nB: (　　　)" atau "[situasi]. (　　　)"\\n' +
-            'BENAR: Q="店員：いらっしゃいませ！\\n客：(　　　)" Opts=["ありがとうございます","すみません","いいです","どうぞ"]\\n' +
-            'BENAR: Q="上司に仕事が終わったことを伝えたい。(　　　)" Opts=["お疲れ様でした","起きます","いきます","説明します"]\\n' +
-            'SALAH: Q="(　　　)" saja — tidak ada konteks!\\n' +
-            'SALAH: Q="いくらですか？" → ini pertanyaan, BUKAN dialog dengan blank!\\n' +
-            'Options=ungkapan Jepang natural, relevan konteks dialog.\\n\\n' +
-
-            '== CHOUKAI ==\n' +
-            'WAJIB: "listeningScript":[{"speaker":"male"|"female","text":"..."},...], "maxPlay":1|2.\n' +
-            '"question"=kalimat tanya SINGKAT (bukan isi script, tanpa \\n).\n' +
-            'INFO DITANYA HARUS ADA DI SCRIPT: tanya jam→script sebut jam; tanya harga→script sebut harga.\n' +
-            'BENAR: [{m:"会議は何時?"},{f:"10時から"}] q="会議は何時から?" → 10時 ADA.\n' +
-            'SALAH: [{f:"会議です"}] q="会議は何時?" → jam tidak ada!\n' +
-            '3 tipe: dialog maxPlay:2 | toko maxPlay:2 | pengumuman maxPlay:1.\n\n' +
-            '== DOKKAI ==\n' +
-            '"docType": surat|memo|chat|email|pengumuman|brosur|jadwal|label_obat|papan_info|daftar_harga.\n' +
-            'TEKS HARUS MEMUAT FAKTA UNTUK MENJAWAB: harga→ada harga; jam→ada jam; populer→sebutkan mana.\n' +
-            'BENAR: "りんご 100円\nバナナ 150円\nバナナは?" A="150円".\n' +
-            'SALAH: "りんご、バナナを売っています。りんごは?" → harga tidak ada!\n' +
-            'SALAH: "おいしいレストラン。一番人気は?" → tidak disebutkan mana paling populer!\n\n' +
-            '== LEVEL == ' + levelGuide + '\n\n' +
-            'QUALITY: TIPE3=hiragana cara baca | expression peran benar | choukai script ada info | dokkai teks ada fakta';
-        const user =
-            'Buat paket JFT-Basic level "' + levelLabel + '" soal TEPAT: ' +
-            'choukai=' + s.choukai + ' | kanji_kotoba=' + s.kanji_kotoba + ' | expression=' + s.expression + ' | dokkai=' + s.dokkai + '\n\n' +
-            'JSON output (dokkai PERTAMA — agar tidak terpotong token):\n{"sections":{"dokkai":[...],"kanji_kotoba":[...],"expression":[...],"choukai":[...]}}\n\n' +
-            'Format: {"question":"...","options":["A","B","C","D"],"answer":"A","explanation":"..."}\n' +
-            'Choukai+: "listeningScript":[{"speaker":"male","text":"..."},...], "maxPlay":2\n' +
-            'Dokkai+: "docType":"..."\n\n' +
-            '!!! DOKKAI WAJIB ' + s.dokkai + ' soal — GENERATE DULU sebelum choukai !!!\n' +
-            '!!! CHOUKAI WAJIB ' + s.choukai + ' soal dengan listeningScript !!!\n' +
-            'Balas JSON saja.';
-        return { system, user };
-    }
-    function _extractJSON(text) {
-        let t = String(text || '').trim();
-        t = t.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-        const start = t.indexOf('{');
-        const end   = t.lastIndexOf('}');
-        if (start === -1 || end === -1 || end <= start) return null;
-        try {
-            return JSON.parse(t.slice(start, end + 1));
-        } catch (e) {
-            return null;
-        }
-    }
-
-    function _isValidQuestion(q, sectionHint) {
-        if (!q || typeof q.question !== 'string') return false;
-        var qt = q.question.trim();
-        // Strip prefix Q="..." atau Q='...' yang AI sering tambahkan dari contoh prompt
-        qt = qt.replace(/^[Qq]\s*[:=]\s*["']/, '').replace(/["']\s*$/, '').trim();
-        if (qt !== q.question.trim()) q.question = qt; // koreksi di objek
-        if (!qt || qt.length < 3) return false;
-        if (!Array.isArray(q.options) || q.options.length !== 4) return false;
-        if (!q.options.every(function(o){ return typeof o === 'string' && o.trim(); })) return false;
-        if (typeof q.answer !== 'string') return false;
-        if (q.explanation == null) q.explanation = '';
-        if (typeof q.explanation !== 'string') return false;
-
-        // ── DOKKAI: validasi ultra-lenient ─────────────────────────────
-        if (sectionHint === 'dokkai') {
-            var _dc = function(s) {
-                return String(s).trim()
-                    .replace(/[\u3000\u00a0 ]+/g, '')
-                    .replace(/[\u3002\u3001\uff1f\uff01\.\?!,]/g, '')
-                    .toLowerCase();
-            };
-            var dcAns = _dc(q.answer);
-            var dcMatch = q.options.find(function(o){ return _dc(o) === dcAns; });
-            if (!dcMatch) {
-                dcMatch = q.options.find(function(o){
-                    var co = _dc(o);
-                    return co.indexOf(dcAns) !== -1 || dcAns.indexOf(co) !== -1;
-                });
-            }
-            if (!dcMatch) {
-                console.warn('[DOKKAI rejected] answer not in opts:', q.answer, q.options);
-                return false;
-            }
-            q.answer = dcMatch;
-            if (q.listeningScript !== undefined) delete q.listeningScript;
-            return true;
-        }
-
-        // ── SEMUA SECTION LAIN ─────────────────────────────────────────
-        var _norm = function(s){ return String(s).trim().replace(/[\s\u3000]+/g,' '); };
-        var normAns = _norm(q.answer);
-        var matched = q.options.find(function(o){ return _norm(o) === normAns; });
-        if (!matched) return false;
-        q.answer = matched;
-
-        var uniq = new Set(q.options.map(function(o){ return o.trim().toLowerCase(); }));
-        if (uniq.size < 4) return false;
-
+    // For choukai: lenient — sanitize listeningScript
+    if (sec === 'choukai') {
         if (q.listeningScript !== undefined) {
-            if (!Array.isArray(q.listeningScript) || !q.listeningScript.length) {
+            if (!Array.isArray(q.listeningScript)||!q.listeningScript.length) {
                 delete q.listeningScript;
             } else {
-                q.listeningScript = q.listeningScript.filter(
-                    function(l){ return l && typeof l.text === 'string' && l.text.trim(); }
-                );
+                q.listeningScript = q.listeningScript.filter(function(l){
+                    return l && typeof l.text==='string'&&l.text.trim();
+                });
                 if (!q.listeningScript.length) delete q.listeningScript;
             }
         }
-
-        var _km = qt.match(/\u3010([^\u3011]+)\u3011/);
-        var target = _km ? _km[1] : null;
-        if (target && q.options.some(function(o){ return o.trim() === target; })) return false;
-
+        // Loose answer match for choukai
+        var cAns = norm(q.answer).toLowerCase();
+        var cMatch = q.options.find(function(o){ return norm(o).toLowerCase()===cAns; });
+        if (!cMatch) {
+            cMatch = q.options.find(function(o){
+                var co=norm(o).toLowerCase();
+                return co.indexOf(cAns)!==-1||cAns.indexOf(co)!==-1;
+            });
+        }
+        if (!cMatch) return false;
+        q.answer = cMatch;
         return true;
     }
-    function _parseAndValidate(raw) {
-        const parsed = _extractJSON(raw);
-        if (!parsed || typeof parsed !== 'object') return null;
 
-        const src = (parsed.sections && typeof parsed.sections === 'object') ? parsed.sections : parsed;
-        const out = {};
-        // Shuffle options agar jawaban tidak selalu di posisi pertama
-        function shuffleQ(q) {
-            var o=q.options.slice();
-            for(var i=o.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=o[i];o[i]=o[j];o[j]=t;}
-            q.options=o; return q;
-        }
-        let totalValid = 0;
-        for (const sec of SECTION_ORDER) {
-            const arr   = Array.isArray(src[sec]) ? src[sec] : [];
-            const valid = arr.filter(q => _isValidQuestion(q, sec)).map(shuffleQ);
-            out[sec] = valid;
-            totalValid += valid.length;
-        }
-        console.debug('[AI_JFT_SIM] soal valid:', Object.fromEntries(SECTION_ORDER.map(s=>[s,out[s].length])));
-        if (totalValid === 0) return null;
-        return out;
+    // For dokkai: loose match (encoding/space differences)
+    if (sec === 'dokkai') {
+        var clean = function(s){ return String(s).replace(/[\s\u3000\u00a0]/g,'').replace(/[。、？！]/g,'').toLowerCase(); };
+        var dAns = clean(q.answer);
+        var dMatch = q.options.find(function(o){ return clean(o)===dAns; });
+        if (!dMatch) dMatch = q.options.find(function(o){var co=clean(o);return co.indexOf(dAns)!==-1||dAns.indexOf(co)!==-1;});
+        if (!dMatch) { console.warn('[DOKKAI rejected]', q.answer, q.options); return false; }
+        q.answer = dMatch;
+        return true;
     }
 
-    async function _generateSession(levelId, modeId, cfg) {
-        _generating = true;
-        _showGeneratingOverlay(cfg);
+    // Normal: exact normalized match
+    var nAns = norm(q.answer);
+    var nMatch = q.options.find(function(o){ return norm(o)===nAns; });
+    if (!nMatch) return false;
+    q.answer = nMatch;
 
-        try {
-            const prompt = _buildPrompt(levelId, cfg);
+    // Duplicate options check
+    var uniq = new Set(q.options.map(function(o){ return o.trim().toLowerCase(); }));
+    if (uniq.size < 4) return false;
 
-            let idToken = '';
-            try {
-                const currentUser = firebase.auth().currentUser;
-                if (currentUser) idToken = await currentUser.getIdToken();
-            } catch (e) { /* ditangani di bawah */ }
+    // Anti-leak: kanji target not in options verbatim
+    var km = q.question.match(/【([^】]+)】/);
+    var tgt = km ? km[1] : null;
+    if (tgt && q.options.some(function(o){ return o.trim()===tgt; })) return false;
 
-            if (!idToken) throw new Error('Sesi login tidak valid. Silakan login ulang.');
+    return true;
+}
 
-            // Escape non-ASCII ke \uXXXX — sama dengan pola AI Sensei, mencegah
-            // ByteString error pada runtime Node.js di api/ai-proxy.
-            const _rawPayload = JSON.stringify({
-                model: MODEL,
-                max_tokens: cfg.maxTokens,
-                temperature: 0.7,
-                messages: [
-                    { role: 'system', content: prompt.system },
-                    { role: 'user',   content: prompt.user },
-                ],
-            });
-            const _safePayload = _rawPayload.replace(
-                /[\u0080-\uFFFF]/g,
-                ch => '\\u' + ('0000' + ch.charCodeAt(0).toString(16)).slice(-4)
-            );
-
-            const res = await fetch('/api/ai-proxy', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + idToken,
-                },
-                body: _safePayload,
-            });
-
-            if (!res.ok) {
-                const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.error || ('HTTP ' + res.status));
-            }
-
-            const data = await res.json();
-            if (data.error) throw new Error(data.error);
-
-            const raw = data?.choices?.[0]?.message?.content;
-            if (!raw) throw new Error('Respon AI kosong. Coba lagi.');
-
-            const sections = _parseAndValidate(raw);
-            if (!sections) throw new Error('Format soal dari AI tidak valid. Coba lagi.');
-
-            // ── Generate berhasil → simpan ke Firestore dulu, BARU potong credit ──
-            const ref = _sessionsRef();
-            if (!ref) throw new Error('Tidak bisa menyimpan sesi — coba login ulang.');
-
-            const docRef    = ref.doc();
-            const sessionId = docRef.id;
-
-            await docRef.set({
-                sessionId,
-                level:         levelId,
-                mode:          modeId,
-                createdAt:     firebase.firestore.FieldValue.serverTimestamp(),
-                creditCost:    cfg.credit,
-                score:         null,
-                completed:     false,
-                sectionScores: {},
-                questions:     sections,
-                // Phase 2
-                timerSeconds:   cfg.timerSeconds || 0,
-                durationSeconds: null,
-                sectionType:    'standard',
-                // V3
-                schemaVersion:  3,
-            });
-
-            // V3: dual-write ke aiJftHistory (non-blocking)
-            const histRef = _historyRef();
-            if (histRef) {
-                histRef.doc(sessionId).set({
-                    examId:    sessionId,
-                    level:     levelId,
-                    mode:      modeId,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    sections,
-                    answers:   [],
-                    score:     null,
-                    completed: false,
-                }).catch(() => {});
-            }
-
-            // ── POTONG CREDIT — hanya sampai titik ini jika semua di atas berhasil ──
-            await AI_SENSEI.deductCredit(cfg.credit);
-
-            // Analytics — fire-and-forget, tidak wajib berhasil
-            try {
-                window.AI_ANALYTICS?.track?.('AI JFT Simulation', cfg.credit, prompt.user.length, raw.length, true);
-            } catch (e) {}
-
-            _activeSession = _buildActiveSession(sessionId, levelId, modeId, cfg.credit, sections, [], cfg.timerSeconds);
-
-            _hideGeneratingOverlay();
-            _generating = false;
-            navigateTo('ai-jft-session');
-
-        } catch (e) {
-            console.error('[AI_JFT_SIM] generate error:', e);
-            _hideGeneratingOverlay();
-            _generating = false;
-            _showGenerateErrorDialog(e.message || 'Gagal membuat soal. Silakan coba lagi.');
-        }
+function parseResponse(raw, expectedSections) {
+    if (!raw) return null;
+    console.debug('[AI_JFT] raw length:', raw.length, '| first 200:', raw.slice(0,200));
+    var parsed = extractJSON(raw);
+    if (!parsed || typeof parsed !== 'object') {
+        console.error('[AI_JFT] JSON parse failed');
+        return null;
     }
-
-    // ─────────────────────────────────────────────────────
-    // DIALOG / OVERLAY UI
-    // ─────────────────────────────────────────────────────
-
-    function _showGeneratingOverlay(cfg) {
-        document.getElementById('aijs-generating-overlay')?.remove();
-        const overlay = document.createElement('div');
-        overlay.id = 'aijs-generating-overlay';
-        overlay.innerHTML =
-            '<div class="aijs-gen-spinner"></div>' +
-            '<div class="aijs-gen-text">🤖 AI sedang menyiapkan ' + cfg.totalSoal + ' soal...</div>' +
-            '<div class="aijs-gen-sub">Proses ini hanya terjadi sekali di awal sesi. Jangan tutup aplikasi.</div>';
-        document.body.appendChild(overlay);
-    }
-    function _hideGeneratingOverlay() {
-        document.getElementById('aijs-generating-overlay')?.remove();
-    }
-
-    function _showInsufficientCreditDialog(needed, have) {
-        document.getElementById('aijs-dialog-popup')?.remove();
-        const overlay = document.createElement('div');
-        overlay.id = 'aijs-dialog-popup';
-        overlay.innerHTML =
-            '<div class="ais-popup-box">' +
-            '<div class="ais-popup-icon">💳</div>' +
-            '<div class="ais-popup-title">Credit Tidak Mencukupi</div>' +
-            '<div class="ais-popup-body">Mode ini membutuhkan <strong>' + needed + ' credit</strong>,<br>' +
-            'sisa credit kamu <strong>' + have + ' credit</strong>.</div>' +
-            '<div class="ais-popup-actions">' +
-            '<button class="ais-popup-btn-secondary" id="aijs-dialog-close">Tutup</button>' +
-            '<button class="ais-popup-btn-primary" id="aijs-dialog-topup">Top Up Credit</button>' +
-            '</div></div>';
-        document.body.appendChild(overlay);
-        document.getElementById('aijs-dialog-close').onclick = () => overlay.remove();
-        document.getElementById('aijs-dialog-topup').onclick = () => { overlay.remove(); navigateTo('ai-credit'); };
-        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-    }
-
-    function _showGenerateErrorDialog(message) {
-        document.getElementById('aijs-dialog-popup')?.remove();
-        const overlay = document.createElement('div');
-        overlay.id = 'aijs-dialog-popup';
-        overlay.innerHTML =
-            '<div class="ais-popup-box">' +
-            '<div class="ais-popup-icon">⚠️</div>' +
-            '<div class="ais-popup-title">Gagal Membuat Soal</div>' +
-            '<div class="ais-popup-body">' + escHTML(message) + '</div>' +
-            '<div class="ais-popup-sub">Credit kamu TIDAK terpotong. Silakan coba lagi.</div>' +
-            '<div class="ais-popup-actions">' +
-            '<button class="ais-popup-btn-primary" id="aijs-dialog-ok" style="width:100%">Tutup</button>' +
-            '</div></div>';
-        document.body.appendChild(overlay);
-        document.getElementById('aijs-dialog-ok').onclick = () => overlay.remove();
-        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-    }
-
-    // ─────────────────────────────────────────────────────
-    // SESSION PAGE — practice flow (tanpa panggilan AI lagi)
-    // ─────────────────────────────────────────────────────
-
-    // ── Phase 2: TIMER ───────────────────────────────────────────
-    function _startTimer(seconds) {
-        _clearTimer();
-        _timerRemaining  = seconds;
-        _sessionStartTs  = Date.now();
-        _updateTimerDisplay();
-        _timerInterval = setInterval(() => {
-            _timerRemaining -= 1;
-            _updateTimerDisplay();
-            if (_timerRemaining <= 0) {
-                _clearTimer();
-                _finishSession(true); // true = time-up
-            }
-        }, 1000);
-    }
-
-    function _clearTimer() {
-        if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
-    }
-
-    function _updateTimerDisplay() {
-        const el = document.getElementById('aijs-timer-display');
-        if (el) {
-            const m = Math.floor(_timerRemaining / 60);
-            const s = _timerRemaining % 60;
-            el.textContent = m + ':' + String(s).padStart(2, '0');
-            el.classList.toggle('aijs-timer-warning', _timerRemaining <= 60);
-        }
-        _syncTimerHero(); // V3: sync hero timer juga
-    }
-
-    function _getElapsedSeconds() {
-        if (!_sessionStartTs) return 0;
-        return Math.round((Date.now() - _sessionStartTs) / 1000);
-    }
-
-        function renderSessionPage() {
-        _bindSessionTopbarOnce();
-
-        if (_sessionLoading) {
-            _renderSessionLoadingState();
-            return;
-        }
-        if (!_activeSession) {
-            navigateTo('ai-jft-setup');
-            return;
-        }
-        // Phase 2: start timer only on fresh session (index 0), not on re-render
-        if (_activeSession.currentIndex === 0 && _activeSession.timerSeconds > 0 && !_timerInterval) {
-            _startTimer(_activeSession.timerSeconds);
-        }
-        // V3: inject timer hero into session body BEFORE question
-        _renderTimerHero();
-        _renderCurrentQuestion();
-    }
-
-    function _renderTimerHero() {
-        // Timer hero: block di atas soal, update bersama _updateTimerDisplay
-        const body = document.getElementById('aijs-session-body');
-        if (!body) return;
-        // Hanya inject sekali; jika sudah ada skip
-        if (document.getElementById('aijs-timer-hero')) return;
-        const hero = document.createElement('div');
-        hero.id = 'aijs-timer-hero';
-        hero.className = 'aijs-timer-hero';
-        const s = _activeSession;
-        const totalSections = SECTION_ORDER.filter(sec => (s.sections[sec]||[]).length > 0).length;
-        const flat = s.flat[s.currentIndex] || {};
-        const secLabel = SECTION_LABELS[flat.section] || '—';
-        const secIndex = SECTION_ORDER.filter(sec => (s.sections[sec]||[]).length > 0)
-                                      .indexOf(flat.section) + 1;
-        hero.innerHTML =
-            '<div class="aijs-timer-hero-time" id="aijs-timer-hero-time">—</div>' +
-            '<div class="aijs-timer-hero-label">WAKTU TERSISA</div>' +
-            '<div class="aijs-timer-hero-section" id="aijs-timer-hero-section">—</div>' +
-            '<div class="aijs-timer-hero-pos" id="aijs-timer-hero-pos"></div>';
-        body.parentElement.insertBefore(hero, body);
-        _syncTimerHero();
-    }
-
-    function _syncTimerHero() {
-        const el = document.getElementById('aijs-timer-hero-time');
-        if (!el) return;
-        const m = Math.floor(_timerRemaining / 60), sc = _timerRemaining % 60;
-        el.textContent = m + ':' + String(sc).padStart(2, '0');
-        el.classList.toggle('aijs-timer-hero-warning', _timerRemaining <= 60);
-        const s = _activeSession; if (!s) return;
-        const flat = s.flat[s.currentIndex] || {};
-        const secLabel = SECTION_LABELS[flat.section] || '—';
-        const activeSecs = SECTION_ORDER.filter(sec => (s.sections[sec]||[]).length > 0);
-        const secIndex = activeSecs.indexOf(flat.section) + 1;
-        const secEl = document.getElementById('aijs-timer-hero-section');
-        const posEl = document.getElementById('aijs-timer-hero-pos');
-        if (secEl) secEl.textContent = secLabel;
-        if (posEl) posEl.textContent = secIndex > 0 ? 'Section ' + secIndex + '/' + activeSecs.length : '';
-    }
-
-    function _bindSessionTopbarOnce() {
-        if (_sessionTopbarBound) return;
-        _sessionTopbarBound = true;
-        const exitBtn = document.getElementById('aijs-session-exit-btn');
-        if (!exitBtn) return;
-        exitBtn.addEventListener('click', () => {
-            const s = _activeSession;
-            const midSession = s && s.currentIndex < s.flat.length;
-            if (midSession && !confirm('Keluar dari sesi ini? Progress yang belum selesai tidak akan tersimpan.')) {
-                return;
-            }
-            _clearTimer();
-            _TTS.stop();
-            _activeSession = null;
-            navigateTo('ai-jft-setup');
+    var src = (parsed.sections && typeof parsed.sections==='object') ? parsed.sections : parsed;
+    var out = {}, total = 0;
+    expectedSections.forEach(function(sec) {
+        var arr = Array.isArray(src[sec]) ? src[sec] : [];
+        var valid = arr.filter(function(q){ return validateQ(q, sec); });
+        // Shuffle options
+        valid.forEach(function(q) {
+            var opts=q.options.slice();
+            for(var i=opts.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=opts[i];opts[i]=opts[j];opts[j]=t;}
+            q.options=opts;
         });
-    }
+        out[sec] = valid;
+        total += valid.length;
+        console.debug('[AI_JFT]', sec, ':', valid.length + '/' + arr.length, 'valid');
+    });
+    return (total > 0) ? out : null;
+}
 
-    function _renderSessionLoadingState() {
-        const body = document.getElementById('aijs-session-body');
-        if (body) {
-            body.innerHTML = '<div class="aijs-session-loading"><div class="aijs-gen-spinner"></div>' +
-                '<div>Memuat soal tersimpan...</div></div>';
+// ─────────────────────────────────────────────────────────────────
+// PROMPTS
+// ─────────────────────────────────────────────────────────────────
+function levelDesc(lvl) {
+    if (lvl==='n5') return 'N5 (JLPT N5 / CEFR A1): kosakata & kalimat sangat dasar. Dominan hiragana+katakana. Kanji hanya: 人日本水火木金土月山川大小中上下食飲見行来帰時間円店駅学校先生友達話聞書買休病院薬。Topik: salam, keluarga, makanan, angka, waktu, transportasi dasar.';
+    return 'N4 (JLPT N4 / CEFR A2 = JFT-Basic standard): kosakata kerja & kehidupan sehari-hari di Jepang. Boleh pakai ~300 kanji umum. Topik: kantor, pabrik, konbini, stasiun, instruksi kerja, jadwal, pengumuman.';
+}
+
+function buildTextPrompt(lvl, n_kk, n_expr, n_dok) {
+    var ld = levelDesc(lvl);
+    var sys = 'You are a JFT-Basic exam question generator for MNN Learning.\n' +
+        'Output ONLY valid JSON. No markdown fences, no explanation text.\n' +
+        'LEVEL: ' + ld + '\n\n' +
+
+        '=== SECTION 1: SCRIPT AND VOCABULARY (kanji_kotoba) — generate ' + n_kk + ' questions ===\n' +
+        'Rotate through these 4 types evenly:\n\n' +
+
+        'TYPE word_meaning — situation description → choose correct word/action.\n' +
+        'question: describe a situation (no blank). options: 4 vocabulary words.\n' +
+        'Ex N5: {"type":"word_meaning","question":"あさ おきて、かおを あらいます。どこで しますか。","options":["おふろ","トイレ","だいどころ","しんしつ"],"answer":"おふろ","explanation":"顔を洗うのはお風呂でします。"}\n\n' +
+
+        'TYPE word_usage — sentence with （　）→ choose word that fits grammatically.\n' +
+        'GRAMMAR RULE: if blank + ます → options must be verb STEMS (おき/ね/あらい), NOT dictionary form.\n' +
+        'Ex N5: {"type":"word_usage","question":"まいあさ 6じに （　） ます。","options":["おき","ね","あらい","いき"],"answer":"おき","explanation":"毎朝6時に起きます。おき is the stem form of 起きる before ます."}\n' +
+        'Ex N4: {"type":"word_usage","question":"だんだん 日本の しゅうかんに （　） きました。","options":["なれて","ふえて","すすんで","もどって"],"answer":"なれて","explanation":"慣れてきました means got accustomed to."}\n\n' +
+
+        'TYPE kanji_reading — sentence with 【kanji word】→ choose correct HIRAGANA READING.\n' +
+        'CRITICAL: All 4 options MUST be different hiragana pronunciations of 【THAT SAME WORD】.\n' +
+        'Options must look similar (same first mora, different ending) to be challenging.\n' +
+        'Ex N4: {"type":"kanji_reading","question":"水道が こわれた ときは でんわして ください。","highlight":"水道","options":["すいとう","すいどう","ずいどう","すいろ"],"answer":"すいどう","explanation":"水道(すいどう) = water supply/tap."}\n' +
+        'Ex N5: {"type":"kanji_reading","question":"えきの まえで 【友達】 を まちました。","highlight":"友達","options":["ともだち","とおだち","ともたち","とうだち"],"answer":"ともだち","explanation":"友達(ともだち) = friend."}\n\n' +
+
+        'TYPE kanji_meaning — sentence with （　）→ choose kanji word that fits.\n' +
+        'Ex N4: {"type":"kanji_meaning","question":"とうきょうタワーが よる あかるく （　） いて、とても きれいでした。","options":["乗って","光って","通って","走って"],"answer":"光って","explanation":"光って(ひかって) = shining/lit up."}\n\n' +
+
+        '=== SECTION 2: CONVERSATION AND EXPRESSION (expression) — generate ' + n_expr + ' questions ===\n' +
+        'Alternate between 2 types:\n\n' +
+
+        'TYPE grammar — dialog with [___] blank → choose correct grammar form.\n' +
+        'Show 2+ lines of dialog. Blank is [___] inside dialog.\n' +
+        'Ex N4: {"type":"grammar","question":"メイさんは エミさんに あかちゃんの おくりものを きいています。\\nメイ：あかちゃんに なにか [___] と おもいますか。\\nエミ：そうですね、えほんは どうでしょうか。","options":["あげない","あげよう","あげるため","あげるつもり"],"answer":"あげるつもり","explanation":"あげるつもり = intend to give."}\n\n' +
+
+        'TYPE expression — situation + dialog with （　）→ choose natural expression.\n' +
+        'Show complete dialog context. Blank is （　）.\n' +
+        'Ex N4: {"type":"expression","question":"ひるやすみに スタッフルームで はなしています。\\nA：おべんとう おいしそうですね。\\nB：ありがとうございます。（　）。\\nA：えっ、ほんとうですか。いいですね。","options":["こちらこそ","もう いちど","また こんど","じぶんで つくりました"],"answer":"じぶんで つくりました","explanation":"自分で作りました = I made it myself."}\n\n' +
+
+        '=== SECTION 3: READING COMPREHENSION (dokkai) — generate ' + n_dok + ' questions ===\n' +
+        'Alternate between 2 types:\n\n' +
+
+        'TYPE comprehend — short text (letter/email/chat/notice) + ONE question.\n' +
+        'Text must contain ALL facts needed to answer. Question on separate line after blank line.\n' +
+        'Ex: {"type":"comprehend","question":"ホアさんに メールが きました。\\n\\nホアさん、こんにちは。\\nらいしゅうの 土曜日 3時から 田中さんの うちで パーティーを します。\\nぜひ きてください。おかしを もってきてください。\\n\\nパーティーは どこで しますか。","doctype":"email","options":["ホアさんの うち","田中さんの うち","かいしゃ","えき"],"answer":"田中さんの うち","explanation":"メールに「田中さんのうちでパーティーをします」とあります。"}\n\n' +
+
+        'TYPE infosearch — price list/schedule/notice → find specific information.\n' +
+        'Include the actual table/list as text in the question. Answer MUST appear in text.\n' +
+        'Ex: {"type":"infosearch","question":"スーパーのチラシです。\\n\\nりんご　100円\\nバナナ　150円\\nみかん　200円\\nぶどう　320円\\n\\nバナナは いくら ですか。","doctype":"flyer","options":["100円","150円","200円","320円"],"answer":"150円","explanation":"チラシにバナナ150円と書いてあります。"}\n\n' +
+
+        'QUALITY RULES:\n' +
+        '1. kanji_reading: ALL 4 options = hiragana readings of the HIGHLIGHTED word only.\n' +
+        '2. word_usage with ます ending: options must be verb STEMS, not dictionary form.\n' +
+        '3. expression/grammar: question MUST contain dialog lines AND a blank.\n' +
+        '4. dokkai: text must explicitly contain information to answer the question.\n' +
+        '5. Answer must match one option EXACTLY (character-for-character).\n' +
+        '6. explanation field is required (in Indonesian or Japanese).\n\n' +
+
+        'Return JSON: {"sections":{"kanji_kotoba":[...],"expression":[...],"dokkai":[...]}}';
+
+    var usr = 'Generate for level ' + LEVELS[lvl] + ':\n' +
+        '- kanji_kotoba: ' + n_kk + ' questions (rotate word_meaning/word_usage/kanji_reading/kanji_meaning)\n' +
+        '- expression: ' + n_expr + ' questions (alternate grammar/expression)\n' +
+        '- dokkai: ' + n_dok + ' questions (alternate comprehend/infosearch)\n\n' +
+        'Return JSON only: {"sections":{"kanji_kotoba":[...],"expression":[...],"dokkai":[...]}}';
+
+    return { system: sys, user: usr };
+}
+
+function buildChoukaiPrompt(lvl, n_cho) {
+    var ld = levelDesc(lvl);
+    var sys = 'You are a JFT-Basic listening comprehension question generator.\n' +
+        'Output ONLY valid JSON. No markdown, no explanation.\n' +
+        'LEVEL: ' + ld + '\n\n' +
+
+        'Generate ' + n_cho + ' choukai (listening) questions. Each question:\n' +
+        '{"listeningScript":[{"speaker":"male"|"female","text":"..."},...], "maxPlay":1|2, "question":"...", "options":["A","B","C","D"], "answer":"A", "explanation":"..."}\n\n' +
+
+        'RULES:\n' +
+        '- listeningScript: 2-6 speaker turns. Natural conversation, not robotic.\n' +
+        '- maxPlay: 2 for conversations, 1 for announcements.\n' +
+        '- question: ONE comprehension question ONLY. NOT a copy of the script.\n' +
+        '- The ANSWER must be explicitly stated or clearly implied in the script.\n' +
+        '- All 4 options must be plausible but only 1 is correct per script.\n\n' +
+
+        '3 types, rotate evenly:\n\n' +
+
+        'TYPE conversation — 2 people, information exchange or social talk.\n' +
+        'Ex N4: script=[{m:"田中さん、お正月は どこに 行きましたか。"},{f:"家族と 京都に 行きました。古いお寺が たくさんあって、よかったです。"},{m:"いいですね。私は ずっと 家に いました。"}]\n' +
+        'question: "女の人は お正月に どこに 行きましたか。"\n' +
+        'options: ["きょうと","とうきょう","おおさか","うち"] answer: "きょうと"\n\n' +
+
+        'TYPE shop — customer + staff at store/station/public place.\n' +
+        'Ex N5: script=[{f:"いらっしゃいませ。"},{m:"すみません、コーヒーを ふたつ ください。"},{f:"かしこまりました。230円に なります。"},{m:"はい、どうぞ。"}]\n' +
+        'question: "男の人は コーヒーを いくつ かいましたか。"\n' +
+        'options: ["ひとつ","ふたつ","みっつ","よっつ"] answer: "ふたつ"\n\n' +
+
+        'TYPE announcement — 1 speaker, work/public announcement. maxPlay:1.\n' +
+        'Ex N4: script=[{f:"みなさんに おしらせします。あすの あさは 8時に こうじょうに あつまってください。くわしいことは けいじばんを みてください。"}]\n' +
+        'question: "あしたは 何時に あつまりますか。"\n' +
+        'options: ["7時","8時","9時","10時"] answer: "8時"\n\n' +
+
+        'Return JSON: {"sections":{"choukai":[...]}}';
+
+    var usr = 'Generate ' + n_cho + ' choukai questions for level ' + LEVELS[lvl] + '.\n' +
+        'Rotate: conversation / shop / announcement.\n' +
+        'Return JSON only: {"sections":{"choukai":[...]}}';
+
+    return { system: sys, user: usr };
+}
+
+// ─────────────────────────────────────────────────────────────────
+// API CALL
+// ─────────────────────────────────────────────────────────────────
+async function callAPI(system, user, maxTokens) {
+    // Get Firebase ID token (same pattern as ai-sensei.js)
+    var idToken = '';
+    try {
+        if (window.firebase && firebase.auth) {
+            var cu = firebase.auth().currentUser;
+            if (cu) idToken = await cu.getIdToken(false);
         }
+    } catch(e) { console.warn('[AI_JFT] getIdToken:', e.message); }
+    if (!idToken) throw new Error('Sesi login tidak valid. Silakan login ulang.');
+
+    var body = JSON.stringify({
+        model: MODEL,
+        max_tokens: maxTokens,
+        temperature: 0.8,
+        messages: [
+            { role: 'system', content: system },
+            { role: 'user',   content: user   },
+        ],
+    });
+
+    // Escape non-ASCII to avoid proxy ByteString issues
+    var safeBody = body.replace(/[\u0080-\uFFFF]/g, function(c){
+        return '\\u' + ('0000'+c.charCodeAt(0).toString(16)).slice(-4);
+    });
+
+    var res = await fetch('/api/ai-proxy', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + idToken,
+        },
+        body: safeBody,
+    });
+
+    if (!res.ok) {
+        var errData = await res.json().catch(function(){ return {}; });
+        throw new Error(errData.error || 'API error ' + res.status);
     }
 
-    function _renderCurrentQuestion() {
-        const s     = _activeSession;
-        const total = s.flat.length;
-        const idx   = s.currentIndex;
+    var data = await res.json();
+    var raw  = data?.choices?.[0]?.message?.content;
+    if (!raw) throw new Error('Respon AI kosong.');
+    return raw;
+}
 
-        if (idx >= total) { _finishSession(); return; }
+// ─────────────────────────────────────────────────────────────────
+// GENERATION (two separate API calls)
+// ─────────────────────────────────────────────────────────────────
+async function generateSession(levelId, modeId) {
+    var cfg = MODES[modeId];
+    var s   = cfg.sections;
 
-        const { section, q } = s.flat[idx];
+    _showLoading('Membuat soal Kanji, Expression, Dokkai...');
 
-        const secLabelEl = document.getElementById('aijs-session-section-label');
-        const counterEl  = document.getElementById('aijs-session-counter');
-        const fillEl     = document.getElementById('aijs-session-progress-fill');
-        if (secLabelEl) secLabelEl.textContent = SECTION_LABELS[section] || section;
-        if (counterEl)  counterEl.textContent  = (idx + 1) + '/' + total;
-        if (fillEl)     fillEl.style.width = Math.round((idx / total) * 100) + '%';
+    // ── CALL 1: Text sections ────────────────────────────────────
+    var p1 = buildTextPrompt(levelId, s.kanji_kotoba, s.expression, s.dokkai);
+    var tok1 = Math.max(2500, (s.kanji_kotoba + s.expression + s.dokkai) * 220);
+    var raw1 = await callAPI(p1.system, p1.user, tok1);
+    var sec1 = parseResponse(raw1, ['kanji_kotoba','expression','dokkai']);
+    if (!sec1) throw new Error('Format soal (text) tidak valid. Coba lagi.');
 
-        const body = document.getElementById('aijs-session-body');
-        if (!body) return;
+    // ── CALL 2: Choukai ──────────────────────────────────────────
+    _showLoading('Membuat soal Choukai (audio)...');
+    var p2 = buildChoukaiPrompt(levelId, s.choukai);
+    var tok2 = Math.max(2000, s.choukai * 350);
+    var raw2 = await callAPI(p2.system, p2.user, tok2);
+    var sec2 = parseResponse(raw2, ['choukai']);
 
-        const optionsHtml = q.options.map((opt, i) =>
-            '<button class="aijs-option-btn" data-idx="' + i + '">' + escHTML(opt) + '</button>'
-        ).join('');
-
-        if (section === 'choukai') { body.innerHTML = ''; _renderChoukaiQuestion(body, q); return; }
-        const imgBlock = _renderImageBlock(q);
-        body.innerHTML =
-            (imgBlock ? '<div class="aijs-q-visual">' + imgBlock + '</div>' : '') +
-            '<div class="aijs-q-card"><div class="aijs-q-text">' + _renderText(q.question) + '</div></div>' +
-            '<div class="aijs-option-list" id="aijs-option-list">' +
-            q.options.map((opt,i)=>'<button class="aijs-option-btn" data-idx="'+i+'">'+_renderText(opt)+'</button>').join('') +
-            '</div><div id="aijs-feedback-slot"></div>';
-        document.querySelectorAll('#aijs-option-list .aijs-option-btn').forEach(btn=>{
-            btn.addEventListener('click',()=>_selectOption(parseInt(btn.dataset.idx,10)));
-        });
-        _bindImageFallbacks(body);
-    }
-
-    // ── CHOUKAI AUDIO FLOW ─────────────────────────────────────────
-    function _renderChoukaiQuestion(body, q) {
-        const warn = _TTS.warningHtml();
-        const hasAudio = !warn && Array.isArray(q.listeningScript) && q.listeningScript.length;
-
-        const maxPlay = (typeof q.maxPlay==='number'&&q.maxPlay>=1)?q.maxPlay:2;
-        body.innerHTML =
-            '<div class="aijs-choukai-wrap">' + warn +
-            '<div class="aijs-q-card"><div class="aijs-choukai-question-text">' + _renderText(q.question) + '</div></div>' +
-            '<div class="aijs-choukai-player" id="aijs-choukai-player">' +
-            (hasAudio
-                ? '<div class="aijs-choukai-play-area"><button class="aijs-play-btn" id="aijs-play-btn">&#9654; Putar Audio <span class="aijs-play-hint">(maks '+maxPlay+'x)</span></button><p class="aijs-choukai-hint">Dengarkan lalu pilih jawaban.</p></div>'
-                : '<p class="aijs-choukai-noscript">Suara tidak tersedia — teks ditampilkan langsung.</p>') +
-            '</div><div id="aijs-choukai-options-slot"></div><div id="aijs-feedback-slot"></div></div>';
-        if (hasAudio) {
-            let pc=0; const pb=document.getElementById('aijs-play-btn'); if(!pb)return;
-            pb.addEventListener('click',function(){ if(pc>=maxPlay)return; pb.disabled=true; pb.innerHTML='&#9646;&#9646; Memutar...';
-                _TTS.speak(q.listeningScript,()=>{pc++;_revealChoukaiOptions(q,pc,maxPlay);});
-            });
-        } else { _showChoukaiScript(q); _revealChoukaiOptions(q,1,1); }
-    }
-
-    function _showChoukaiScript(q) {
-        const player = document.getElementById('aijs-choukai-player');
-        if (!player || !Array.isArray(q.listeningScript)) return;
-        const lines = q.listeningScript.map(l => {
-            const icon = l.speaker === 'male' ? '👨' : '👩';
-            return '<div class="aijs-script-line aijs-script-' + escHTML(l.speaker || 'female') + '">' +
-                   '<span class="aijs-script-icon">' + icon + '</span>' +
-                   '<span class="aijs-script-text">' + _renderText(l.text || '') + '</span></div>';
-        }).join('');
-        player.innerHTML = '<div class="aijs-script-box">' + lines + '</div>';
-    }
-
-    function _revealChoukaiOptions(q, playCount, maxPlay) {
-        playCount = playCount||1; maxPlay = maxPlay||2;
-        const spinner = document.getElementById('aijs-choukai-spinner');
-        if (spinner) spinner.remove();
-
-        // Show script after audio done
-        const player = document.getElementById('aijs-choukai-player');
-        if (player && Array.isArray(q.listeningScript)) {
-            const lines = q.listeningScript.map(l => {
-                const icon = l.speaker === 'male' ? '👨' : '👩';
-                return '<div class="aijs-script-line aijs-script-' + escHTML(l.speaker || 'female') + '">' +
-                       '<span class="aijs-script-icon">' + icon + '</span>' +
-                       '<span class="aijs-script-text">' + _renderText(l.text || '') + '</span></div>';
-            }).join('');
-            player.innerHTML = '<div class="aijs-script-box">' + lines + '</div>' +
-                (_TTS.ALLOW_REPLAY && _TTS._hasJpVoice() && Array.isArray(q.listeningScript) && (q.maxPlay || 2) > 1
-                    ? '<button class="aijs-replay-btn" id="aijs-replay-btn">🔁 Putar Ulang</button>'
-                    : '');
-            const replayBtn = document.getElementById('aijs-replay-btn');
-            if (replayBtn) {
-                // maxPlay: 1 = sekali saja, 2 = boleh ulang (default JFT: 2)
-                const maxPlay  = (typeof q.maxPlay === 'number') ? q.maxPlay : 2;
-                let   playCount = 1; // sudah diputar sekali otomatis
-                const updateReplayBtn = () => {
-                    if (playCount >= maxPlay) {
-                        replayBtn.disabled = true;
-                        replayBtn.textContent = '🔇 Batas putar tercapai';
-                    }
-                };
-                replayBtn.addEventListener('click', () => {
-                    if (playCount >= maxPlay) return;
-                    replayBtn.disabled = true;
-                    replayBtn.textContent = '⏸ Memutar...';
-                    _TTS.speak(q.listeningScript, () => {
-                        playCount++;
-                        replayBtn.disabled = false;
-                        replayBtn.textContent = '🔁 Putar Ulang (' + playCount + '/' + maxPlay + ')';
-                        updateReplayBtn();
-                    });
-                });
-                replayBtn.textContent = '🔁 Putar Ulang (1/' + maxPlay + ')';
-                updateReplayBtn();
-            }
-        }
-
-        const slot = document.getElementById('aijs-choukai-options-slot');
-        if (!slot) return;
-        const optionsHtml = q.options.map((opt, i) =>
-            '<button class="aijs-option-btn" data-idx="' + i + '">' + escHTML(opt) + '</button>'
-        ).join('');
-        slot.innerHTML = '<div class="aijs-option-list" id="aijs-option-list">' + optionsHtml + '</div>';
-        document.querySelectorAll('#aijs-option-list .aijs-option-btn').forEach(btn => {
-            btn.addEventListener('click', () => _selectOption(parseInt(btn.dataset.idx, 10)));
-        });
-    }
-
-    function _selectOption(optionIndex) {
-        const s = _activeSession;
-        if (!s || s.answered) return;
-
-        const { section, q } = s.flat[s.currentIndex];
-        const correct = q.options[optionIndex] === q.answer;
-
-        s.answered = true;
-        s.answers.push({ section, selectedIndex: optionIndex, correct });
-
-        document.querySelectorAll('#aijs-option-list .aijs-option-btn').forEach((btn, i) => {
-            btn.classList.add('aijs-opt-disabled');
-            if (q.options[i] === q.answer) btn.classList.add('aijs-opt-correct');
-            else if (i === optionIndex) btn.classList.add('aijs-opt-wrong');
-        });
-
-        const slot = document.getElementById('aijs-feedback-slot');
-        if (slot) {
-            const isLast = (s.currentIndex + 1 >= s.flat.length);
-            slot.innerHTML =
-                '<div class="aijs-feedback-box">' +
-                '<div class="aijs-feedback-title ' + (correct ? 'aijs-fb-correct' : 'aijs-fb-wrong') + '">' +
-                (correct ? '✅ Benar!' : '❌ Kurang tepat') + '</div>' +
-                escHTML(q.explanation) +
-                '</div>' +
-                '<button class="aijs-btn" id="aijs-next-btn" style="margin-top:14px">' +
-                (isLast ? 'Lihat Hasil →' : 'Lanjut →') + '</button>';
-            document.getElementById('aijs-next-btn').addEventListener('click', _goToNextQuestion);
-        }
-    }
-
-    function _goToNextQuestion() {
-        const s = _activeSession;
-        if (!s) return;
-        _TTS.stop();
-        s.currentIndex += 1;
-        s.answered = false;
-        _renderCurrentQuestion();
-    }
-
-    async function _finishSession(timeUp) {
-        const s = _activeSession;
-        if (!s) return;
-        _clearTimer();
-        const durationSeconds = _getElapsedSeconds();
-
-        const sectionScores = {};
-        SECTION_ORDER.forEach(sec => { sectionScores[sec] = { correct: 0, total: 0 }; });
-        s.answers.forEach(a => {
-            if (!sectionScores[a.section]) sectionScores[a.section] = { correct: 0, total: 0 };
-            sectionScores[a.section].total   += 1;
-            if (a.correct) sectionScores[a.section].correct += 1;
-        });
-
-        const totalCorrect = s.answers.filter(a => a.correct).length;
-        const totalSoal    = s.flat.length;
-        const overallScore = totalSoal ? Math.round((totalCorrect / totalSoal) * 100) : 0;
-
-        const fillEl = document.getElementById('aijs-session-progress-fill');
-        const counterEl = document.getElementById('aijs-session-counter');
-        const secLabelEl = document.getElementById('aijs-session-section-label');
-        if (fillEl) fillEl.style.width = '100%';
-        if (counterEl) counterEl.textContent = totalSoal + '/' + totalSoal;
-        if (secLabelEl) secLabelEl.textContent = 'Selesai';
-
-        // Simpan hasil — overwrite score/sectionScores/completed di dokumen sesi yang sama.
-        // Berlaku juga untuk sesi hasil 🔄 Ulangi (sengaja menimpa skor lama, lihat catatan di chat).
-        try {
-            const ref = _sessionsRef();
-            if (ref) {
-                await ref.doc(s.sessionId).set({
-                        score: overallScore, completed: true, sectionScores,
-                        durationSeconds,  // Phase 2
-                    }, { merge: true });
-            }
-        } catch (e) {
-            console.warn('[AI_JFT_SIM] Gagal menyimpan hasil sesi (non-fatal):', e.message);
-        }
-
-        _renderSummary(overallScore, sectionScores, totalSoal);
-    }
-
-    function _renderSummary(overallScore, sectionScores, totalSoal) {
-        const body = document.getElementById('aijs-session-body');
-        if (!body) return;
-
-        const rowsHtml = SECTION_ORDER.map(sec => {
-            const sc = sectionScores[sec] || { correct: 0, total: 0 };
-            return '<div class="aijs-summary-row">' +
-                '<span class="aijs-summary-row-name">' + SECTION_LABELS[sec] + '</span>' +
-                '<span class="aijs-summary-row-score">' + sc.correct + '/' + sc.total + '</span></div>';
-        }).join('');
-
-        body.innerHTML =
-            '<div class="aijs-summary-wrap">' +
-            '<div class="aijs-summary-score">' + overallScore + '%</div>' +
-            '<div class="aijs-summary-label">Skor keseluruhan · ' + totalSoal + ' soal</div>' +
-            '<div class="aijs-summary-sections">' + rowsHtml + '</div>' +
-            '<div class="aijs-summary-actions">' +
-            '<button class="aijs-btn" id="aijs-summary-retry-btn">🔄 Ulangi Soal Ini</button>' +
-            '<button class="aijs-btn-secondary" id="aijs-summary-back-btn">← Kembali ke Setup</button>' +
-            '</div></div>';
-
-        document.getElementById('aijs-summary-retry-btn').addEventListener('click', () => retrySession(_activeSession.sessionId));
-        document.getElementById('aijs-summary-back-btn').addEventListener('click', () => {
-            _activeSession = null;
-            navigateTo('ai-jft-setup');
-        });
-    }
-
-    // ─────────────────────────────────────────────────────
-    // ULANGI — pakai soal tersimpan di Firestore, TANPA panggil AI, TANPA potong credit
-    // ─────────────────────────────────────────────────────
-    async function retrySession(sessionId) {
-        const ref = _sessionsRef();
-        if (!ref || !sessionId) return;
-
-        _sessionLoading = true;
-        navigateTo('ai-jft-session'); // memicu renderSessionPage() → tampil state loading
-
-        try {
-            const snap = await ref.doc(sessionId).get();
-            if (!snap.exists) throw new Error('Sesi tidak ditemukan.');
-            const data = snap.data();
-
-            _activeSession = _buildActiveSession(sessionId, data.level, data.mode, data.creditCost, data.questions || {}, [], data.timerSeconds || 0);
-            _sessionLoading = false;
-            _renderCurrentQuestion();
-        } catch (e) {
-            console.error('[AI_JFT_SIM] retrySession error:', e.message);
-            _sessionLoading = false;
-            const body = document.getElementById('aijs-session-body');
-            if (body) {
-                body.innerHTML = '<div class="aijs-session-loading">⚠️ Gagal memuat sesi tersimpan.<br>' +
-                    '<button class="aijs-btn-secondary" id="aijs-retry-back-btn" style="margin-top:10px">← Kembali</button></div>';
-                document.getElementById('aijs-retry-back-btn')?.addEventListener('click', () => navigateTo('ai-jft-setup'));
-            }
-        }
-    }
-
-    // ─────────────────────────────────────────────────────
-    // RIWAYAT SIMULASI AI
-    // ─────────────────────────────────────────────────────
-    async function loadHistory() {
-        const list = document.getElementById('aijs-history-list');
-        if (!list) return;
-        list.innerHTML = '<div class="aijs-history-empty">Memuat riwayat...</div>';
-
-        const ref = _sessionsRef();
-        if (!ref) {
-            list.innerHTML = '<div class="aijs-history-empty">Login untuk melihat riwayat.</div>';
-            return;
-        }
-
-        try {
-            let docs;
-            try {
-                const snap = await ref.orderBy('createdAt', 'desc').limit(15).get();
-                docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            } catch (e) {
-                // Fallback tanpa orderBy jika composite index belum tersedia
-                const snap2 = await ref.limit(15).get();
-                docs = snap2.docs.map(d => ({ id: d.id, ...d.data() }));
-                docs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-            }
-
-            if (!docs.length) {
-                list.innerHTML = '<div class="aijs-history-empty">Belum ada riwayat simulasi.</div>';
-                return;
-            }
-
-            list.innerHTML = docs.map(d => {
-                const date = d.createdAt?.toDate
-                    ? d.createdAt.toDate().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                    : '-';
-                const levelLabel = LEVELS[d.level] || d.level || '-';
-                const modeLabel  = MODES[d.mode]?.label || d.mode || '-';
-                const scoreHtml  = (d.completed && typeof d.score === 'number')
-                    ? '<div class="aijs-history-score">' + d.score + '%</div>'
-                    : '<div class="aijs-history-score aijs-pending">Belum selesai</div>';
-
-                // Phase 2: durasi pengerjaan
-                const dur = (typeof d.durationSeconds === 'number')
-                    ? Math.floor(d.durationSeconds / 60) + 'm ' + (d.durationSeconds % 60) + 'd'
-                    : null;
-                const durHtml = dur
-                    ? '<span class="aijs-history-dur">⏱ ' + dur + '</span>'
-                    : '';
-
-                return '<div class="aijs-history-item">' +
-                    '<div class="aijs-history-info">' +
-                    '<div class="aijs-history-meta">' + escHTML(levelLabel) + ' · ' + escHTML(modeLabel) + durHtml + '</div>' +
-                    '<div class="aijs-history-date">' + date + '</div></div>' +
-                    scoreHtml +
-                    '<button class="aijs-history-retry" data-sid="' + d.id + '">🔄 Ulangi</button></div>';
-            }).join('');
-
-            list.querySelectorAll('.aijs-history-retry').forEach(btn => {
-                btn.addEventListener('click', () => retrySession(btn.dataset.sid));
-            });
-        } catch (e) {
-            console.error('[AI_JFT_SIM] loadHistory error:', e.message);
-            list.innerHTML = '<div class="aijs-history-empty">Gagal memuat riwayat.</div>';
-        }
-    }
-
-    // ─────────────────────────────────────────────────────
-    // PUBLIC API
-    // ─────────────────────────────────────────────────────
-    return {
-        renderSetupPage,
-        renderSessionPage,
-        startGeneration,
-        retrySession,
-        loadHistory,
+    // Merge
+    var allSections = {
+        kanji_kotoba: sec1.kanji_kotoba || [],
+        expression:   sec1.expression   || [],
+        choukai:      (sec2 && sec2.choukai) ? sec2.choukai : [],
+        dokkai:       sec1.dokkai       || [],
     };
 
-})();
+    // Build flat question list in section order
+    var flat = [];
+    SECTION_ORDER.forEach(function(sec) {
+        (allSections[sec] || []).forEach(function(q,i) {
+            flat.push({ section: sec, q: q, secIdx: i });
+        });
+    });
 
-window.AI_JFT_SIM = AI_JFT_SIM;
+    if (flat.length === 0) throw new Error('Tidak ada soal valid. Coba lagi.');
+
+    return {
+        levelId, modeId,
+        sections: allSections,
+        flat: flat,
+        currentIdx: 0,
+        answers: [],
+        timerRemaining: cfg.timer,
+        createdAt: Date.now(),
+    };
+}
+
+// ─────────────────────────────────────────────────────────────────
+// TTS (Speech Synthesis)
+// ─────────────────────────────────────────────────────────────────
+var _TTS = {
+    _voices: null,
+    _jpVoice: null,
+
+    _init: function() {
+        if (!window.speechSynthesis) return;
+        var load = function() {
+            _TTS._voices = window.speechSynthesis.getVoices();
+            _TTS._jpVoice = _TTS._voices.find(function(v){
+                return v.lang==='ja-JP'||v.lang==='ja';
+            }) || null;
+        };
+        load();
+        if (window.speechSynthesis.onvoiceschanged !== undefined) {
+            window.speechSynthesis.onvoiceschanged = load;
+        }
+    },
+
+    hasJp: function() { return !!_TTS._jpVoice; },
+
+    speak: function(script, onDone) {
+        if (!window.speechSynthesis || !_TTS._jpVoice) {
+            if (onDone) onDone();
+            return;
+        }
+        window.speechSynthesis.cancel();
+        var lines = script.filter(function(l){ return l&&l.text; });
+        var idx = 0;
+        function next() {
+            if (idx >= lines.length) { if (onDone) onDone(); return; }
+            var u = new SpeechSynthesisUtterance(lines[idx].text);
+            u.voice = _TTS._jpVoice;
+            u.lang  = 'ja-JP';
+            u.rate  = 0.9;
+            u.pitch = lines[idx].speaker === 'male' ? 0.85 : 1.1;
+            u.onend = function(){ idx++; next(); };
+            u.onerror = function(){ idx++; next(); };
+            window.speechSynthesis.speak(u);
+            idx++;
+        }
+        // Only trigger 'next' once per utterance via onend
+        idx = 0;
+        var u0 = new SpeechSynthesisUtterance(lines[0].text);
+        u0.voice = _TTS._jpVoice; u0.lang='ja-JP'; u0.rate=0.9;
+        u0.pitch = lines[0].speaker==='male'?0.85:1.1;
+        u0.onend = function(){
+            idx=1;
+            function playNext() {
+                if (idx>=lines.length){if(onDone)onDone();return;}
+                var u=new SpeechSynthesisUtterance(lines[idx].text);
+                u.voice=_TTS._jpVoice;u.lang='ja-JP';u.rate=0.9;
+                u.pitch=lines[idx].speaker==='male'?0.85:1.1;
+                u.onend=function(){idx++;playNext();};
+                window.speechSynthesis.speak(u);
+                idx++;
+            }
+            playNext();
+        };
+        window.speechSynthesis.speak(u0);
+    },
+};
+
+// ─────────────────────────────────────────────────────────────────
+// TIMER
+// ─────────────────────────────────────────────────────────────────
+function startTimer() {
+    if (_tid) clearInterval(_tid);
+    _tid = setInterval(function() {
+        if (!_S) { clearInterval(_tid); return; }
+        _S.timerRemaining--;
+        syncTimer();
+        if (_S.timerRemaining <= 0) {
+            clearInterval(_tid);
+            submitSession();
+        }
+    }, 1000);
+}
+
+function syncTimer() {
+    if (!_S) return;
+    var m  = Math.floor(_S.timerRemaining/60);
+    var sc = _S.timerRemaining%60;
+    var txt = m+':'+String(sc).padStart(2,'0');
+
+    // Small timer in topbar
+    var td = document.getElementById('aijs-timer-display');
+    if (td) td.textContent = txt;
+
+    // Hero timer
+    var ht = document.getElementById('aijs-timer-hero-time');
+    if (ht) {
+        ht.textContent = txt;
+        ht.classList.toggle('aijs-timer-hero-warning', _S.timerRemaining<=60);
+    }
+
+    // Section label in hero
+    var cur = _S.flat[_S.currentIdx] || {};
+    var secLabel = SEC_LABEL[cur.section] || '';
+    var activeSecs = SECTION_ORDER.filter(function(s){ return (_S.sections[s]||[]).length>0; });
+    var secPos = activeSecs.indexOf(cur.section)+1;
+    var hs = document.getElementById('aijs-timer-hero-section');
+    var hp = document.getElementById('aijs-timer-hero-pos');
+    if (hs) hs.textContent = secLabel;
+    if (hp) hp.textContent = secPos>0 ? 'Section '+secPos+'/'+activeSecs.length : '';
+}
+
+function injectTimerHero() {
+    if (document.getElementById('aijs-timer-hero')) { syncTimer(); return; }
+    var body = document.getElementById('aijs-session-body');
+    if (!body) return;
+    var hero = document.createElement('div');
+    hero.id = 'aijs-timer-hero';
+    hero.className = 'aijs-timer-hero';
+    hero.innerHTML =
+        '<div class="aijs-timer-hero-time" id="aijs-timer-hero-time">—</div>' +
+        '<div class="aijs-timer-hero-label">WAKTU TERSISA</div>' +
+        '<div class="aijs-timer-hero-section" id="aijs-timer-hero-section">—</div>' +
+        '<div class="aijs-timer-hero-pos" id="aijs-timer-hero-pos"></div>';
+    body.parentElement.insertBefore(hero, body);
+    syncTimer();
+}
+
+// ─────────────────────────────────────────────────────────────────
+// SESSION RENDERING
+// ─────────────────────────────────────────────────────────────────
+function _showLoading(msg) {
+    var body = document.getElementById('aijs-session-body');
+    if (body) body.innerHTML =
+        '<div class="aijs-session-loading">' +
+        '<div class="aijs-gen-spinner"></div>' +
+        '<div style="margin-top:12px;opacity:.7">' + esc(msg||'Membuat soal...') + '</div>' +
+        '</div>';
+}
+
+function updateTopbar() {
+    if (!_S) return;
+    var cur = _S.flat[_S.currentIdx] || {};
+    var secLabel = SEC_LABEL[cur.section] || '';
+    var el = document.getElementById('aijs-session-section-label');
+    if (el) el.textContent = secLabel;
+
+    var total = _S.flat.length;
+    var cnt = document.getElementById('aijs-session-counter');
+    if (cnt) cnt.textContent = (_S.currentIdx+1) + '/' + total;
+
+    // Progress bar
+    var pct = total > 0 ? ((_S.currentIdx+1)/total*100).toFixed(1) : 0;
+    var fill = document.getElementById('aijs-session-progress-fill');
+    if (fill) fill.style.width = pct + '%';
+}
+
+function renderCurrentQuestion() {
+    var body = document.getElementById('aijs-session-body');
+    if (!body || !_S) return;
+
+    var cur = _S.flat[_S.currentIdx];
+    if (!cur) return;
+
+    var { section, q } = cur;
+
+    updateTopbar();
+    syncTimer();
+
+    // Choukai: special audio flow
+    if (section === 'choukai') {
+        body.innerHTML = '';
+        renderChoukaiQuestion(body, q);
+        return;
+    }
+
+    // Build question HTML
+    var questionHtml = '';
+    if (q.type === 'kanji_reading') {
+        questionHtml = renderKanjiQuestion(q);
+    } else {
+        questionHtml = renderText(q.question);
+    }
+
+    var optionsHtml = q.options.map(function(opt, i) {
+        return '<button class="aijs-option-btn" data-idx="'+i+'">' + renderText(opt) + '</button>';
+    }).join('');
+
+    body.innerHTML =
+        '<div class="aijs-q-card"><div class="aijs-q-text">' + questionHtml + '</div></div>' +
+        '<div class="aijs-option-list" id="aijs-option-list">' + optionsHtml + '</div>' +
+        '<div id="aijs-feedback-slot"></div>';
+
+    document.querySelectorAll('#aijs-option-list .aijs-option-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(){ selectOption(parseInt(btn.dataset.idx,10)); });
+    });
+}
+
+function renderChoukaiQuestion(body, q) {
+    var hasAudio = _TTS.hasJp() && Array.isArray(q.listeningScript) && q.listeningScript.length > 0;
+    var maxPlay  = (typeof q.maxPlay==='number' && q.maxPlay>=1) ? q.maxPlay : 2;
+    var playHint = '(maks ' + maxPlay + '×)';
+
+    body.innerHTML =
+        '<div class="aijs-choukai-wrap">' +
+        '<div class="aijs-q-card"><div class="aijs-choukai-q-text">' + renderText(q.question) + '</div></div>' +
+        '<div class="aijs-choukai-player" id="aijs-choukai-player">' +
+        (hasAudio
+            ? '<div class="aijs-choukai-play-area">' +
+              '<button class="aijs-play-btn" id="aijs-play-btn">▶ Putar Audio <span class="aijs-play-hint">'+playHint+'</span></button>' +
+              '<p class="aijs-choukai-hint">Dengarkan audio, lalu pilih jawaban.</p>' +
+              '</div>'
+            : '<p class="aijs-choukai-noscript">⚠ Suara Jepang tidak tersedia — teks ditampilkan langsung.</p>') +
+        '</div>' +
+        '<div id="aijs-choukai-opts-slot"></div>' +
+        '<div id="aijs-feedback-slot"></div>' +
+        '</div>';
+
+    if (hasAudio) {
+        var playCount = 0;
+        var playBtn = document.getElementById('aijs-play-btn');
+        if (!playBtn) return;
+        playBtn.addEventListener('click', function() {
+            if (playCount >= maxPlay) return;
+            playBtn.disabled = true;
+            playBtn.innerHTML = '⏸ Memutar...';
+            _TTS.speak(q.listeningScript, function() {
+                playCount++;
+                revealChoukaiOptions(q, playCount, maxPlay);
+            });
+        });
+    } else {
+        // Fallback: show script text, reveal options
+        showChoukaiScript(q);
+        revealChoukaiOptions(q, 1, 1);
+    }
+}
+
+function showChoukaiScript(q) {
+    var player = document.getElementById('aijs-choukai-player');
+    if (!player || !Array.isArray(q.listeningScript)) return;
+    var lines = q.listeningScript.map(function(l) {
+        var icon = l.speaker==='male' ? '👨' : '👩';
+        return '<div class="aijs-script-line">' +
+               '<span class="aijs-script-icon">'+icon+'</span>' +
+               '<span class="aijs-script-text">'+renderText(l.text||'')+'</span>' +
+               '</div>';
+    }).join('');
+    player.innerHTML = '<div class="aijs-script-box">' + lines + '</div>';
+}
+
+function revealChoukaiOptions(q, playCount, maxPlay) {
+    // Show script after first play
+    var player = document.getElementById('aijs-choukai-player');
+    if (player && Array.isArray(q.listeningScript) && q.listeningScript.length) {
+        var lines = q.listeningScript.map(function(l) {
+            var icon = l.speaker==='male' ? '👨' : '👩';
+            return '<div class="aijs-script-line">' +
+                   '<span class="aijs-script-icon">'+icon+'</span>' +
+                   '<span class="aijs-script-text">'+renderText(l.text||'')+'</span>' +
+                   '</div>';
+        }).join('');
+        var replayBtn = '';
+        if (playCount < maxPlay && _TTS.hasJp()) {
+            replayBtn = '<button class="aijs-replay-btn" id="aijs-replay-btn">▶ Putar Ulang ('+playCount+'/'+maxPlay+')</button>';
+        }
+        player.innerHTML = '<div class="aijs-script-box">'+lines+'</div>' + replayBtn;
+        var rb = document.getElementById('aijs-replay-btn');
+        if (rb) rb.addEventListener('click', function() {
+            rb.disabled = true;
+            rb.textContent = '⏸ Memutar...';
+            _TTS.speak(q.listeningScript, function() {
+                revealChoukaiOptions(q, playCount+1, maxPlay);
+            });
+        });
+    }
+
+    // Show options
+    var slot = document.getElementById('aijs-choukai-opts-slot');
+    if (!slot) return;
+    var optHtml = q.options.map(function(opt, i) {
+        return '<button class="aijs-option-btn" data-idx="'+i+'">'+renderText(opt)+'</button>';
+    }).join('');
+    slot.innerHTML = '<div class="aijs-option-list" id="aijs-option-list">'+optHtml+'</div>';
+    document.querySelectorAll('#aijs-option-list .aijs-option-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(){ selectOption(parseInt(btn.dataset.idx,10)); });
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────
+// ANSWER HANDLING
+// ─────────────────────────────────────────────────────────────────
+function selectOption(idx) {
+    if (!_S) return;
+    var cur = _S.flat[_S.currentIdx];
+    if (!cur) return;
+    var q = cur.q;
+    var chosen = q.options[idx];
+    var correct = (chosen === q.answer);
+
+    // Record answer
+    _S.answers.push({
+        section: cur.section,
+        question: q.question,
+        chosen: chosen,
+        correct: correct,
+        answer: q.answer,
+    });
+
+    // Disable all buttons
+    document.querySelectorAll('.aijs-option-btn').forEach(function(btn, i) {
+        btn.disabled = true;
+        if (q.options[i] === q.answer)  btn.classList.add('aijs-opt-correct');
+        if (i === idx && !correct)       btn.classList.add('aijs-opt-wrong');
+    });
+
+    // Show feedback
+    var fb = document.getElementById('aijs-feedback-slot');
+    if (fb) {
+        fb.innerHTML = correct
+            ? '<div class="aijs-feedback aijs-fb-correct"><b>✅ Benar!</b><br>' + renderText(q.explanation||'') + '</div>' +
+              '<button class="aijs-next-btn" id="aijs-next-btn">Lanjut →</button>'
+            : '<div class="aijs-feedback aijs-fb-wrong"><b>❌ Kurang tepat.</b><br>' + renderText(q.explanation||'') + '</div>' +
+              '<button class="aijs-next-btn" id="aijs-next-btn">Lanjut →</button>';
+        var nb = document.getElementById('aijs-next-btn');
+        if (nb) nb.addEventListener('click', nextQuestion);
+    }
+}
+
+function nextQuestion() {
+    if (!_S) return;
+    _S.currentIdx++;
+    if (_S.currentIdx >= _S.flat.length) {
+        submitSession();
+    } else {
+        renderCurrentQuestion();
+    }
+}
+
+function submitSession() {
+    if (_tid) { clearInterval(_tid); _tid = null; }
+    if (!_S) return;
+
+    var total   = _S.answers.length;
+    var correct = _S.answers.filter(function(a){ return a.correct; }).length;
+    var pct     = total > 0 ? Math.round(correct/total*100) : 0;
+
+    // Per-section scores
+    var secScores = {};
+    SECTION_ORDER.forEach(function(sec){ secScores[sec]={c:0,t:0}; });
+    _S.answers.forEach(function(a){
+        if (secScores[a.section]) {
+            secScores[a.section].t++;
+            if (a.correct) secScores[a.section].c++;
+        }
+    });
+
+    // Save to Firestore
+    _saveHistory(_S.levelId, _S.modeId, correct, total, _S.answers).catch(function(){});
+
+    // Render score screen
+    var body = document.getElementById('aijs-session-body');
+    if (!body) return;
+
+    var secRows = SECTION_ORDER.map(function(sec) {
+        var sc = secScores[sec];
+        return '<div class="aijs-score-row">' +
+               '<span>' + esc(SEC_LABEL[sec]||sec) + '</span>' +
+               '<span>' + sc.c + '/' + sc.t + '</span>' +
+               '</div>';
+    }).join('');
+
+    body.innerHTML =
+        '<div class="aijs-score-wrap">' +
+        '<div class="aijs-score-pct">' + pct + '%</div>' +
+        '<div class="aijs-score-sub">Skor keseluruhan · ' + total + ' soal</div>' +
+        '<div class="aijs-score-table">' + secRows + '</div>' +
+        '<button class="aijs-btn" id="aijs-retry-btn">↻ Ulangi Soal Ini</button>' +
+        '<button class="aijs-btn-ghost" id="aijs-back-score-btn">← Kembali ke Setup</button>' +
+        '</div>';
+
+    document.getElementById('aijs-retry-btn')?.addEventListener('click', function() {
+        _startSession(_S.levelId, _S.modeId, _S.sections, _S.flat);
+    });
+    document.getElementById('aijs-back-score-btn')?.addEventListener('click', function() {
+        _S = null;
+        window.navigateTo && navigateTo('ai-jft-setup');
+    });
+}
+
+function _startSession(levelId, modeId, sections, flat) {
+    _S = {
+        levelId, modeId, sections, flat,
+        currentIdx: 0,
+        answers: [],
+        timerRemaining: MODES[modeId].timer,
+    };
+    injectTimerHero();
+    renderCurrentQuestion();
+    startTimer();
+}
+
+// ─────────────────────────────────────────────────────────────────
+// HISTORY (Firestore)
+// ─────────────────────────────────────────────────────────────────
+async function _saveHistory(levelId, modeId, correct, total, answers) {
+    var uid = window.AUTH?.user?.uid;
+    if (!uid || typeof _fbDb === 'undefined') return;
+    try {
+        var ref = _fbDb.collection('users').doc(uid).collection('aiJftHistory').doc();
+        var ts = typeof firebase !== 'undefined' && firebase.firestore
+            ? firebase.firestore.FieldValue.serverTimestamp()
+            : new Date();
+        await ref.set({
+            levelId: levelId, modeId: modeId, correct: correct, total: total,
+            score: total>0 ? Math.round(correct/total*100) : 0,
+            createdAt: ts,
+        });
+    } catch(e) { console.warn('[AI_JFT] history save failed:', e.message); }
+}
+
+async function _loadHistory() {
+    var uid = window.AUTH?.user?.uid;
+    var el  = document.getElementById('aijs-history-list');
+    if (!el) return;
+    if (!uid || typeof _fbDb === 'undefined') {
+        el.innerHTML = '<div class="aijs-history-empty">Login untuk melihat riwayat.</div>';
+        return;
+    }
+    try {
+        el.innerHTML = '<div class="aijs-history-empty">Memuat...</div>';
+        var snap = await _fbDb.collection('users').doc(uid)
+            .collection('aiJftHistory')
+            .orderBy('createdAt','desc').limit(10).get();
+        if (snap.empty) {
+            el.innerHTML = '<div class="aijs-history-empty">Belum ada riwayat simulasi.</div>';
+            return;
+        }
+        var html = '';
+        snap.forEach(function(doc) {
+            var d = doc.data();
+            var mLabel = MODES[d.modeId]?.label || d.modeId || '?';
+            var lLabel = LEVELS[d.levelId] || d.levelId || '?';
+            var ts = d.createdAt?.toDate ? d.createdAt.toDate().toLocaleDateString('id') : '';
+            html += '<div class="aijs-history-item">' +
+                    '<div class="aijs-history-meta">' + esc(lLabel) + ' · ' + esc(mLabel) + ' · ' + esc(ts) + '</div>' +
+                    '<div class="aijs-history-score">' + (d.score||0) + '%</div>' +
+                    '</div>';
+        });
+        el.innerHTML = html;
+    } catch(e) {
+        el.innerHTML = '<div class="aijs-history-empty">Gagal memuat riwayat.</div>';
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// SETUP PAGE
+// ─────────────────────────────────────────────────────────────────
+function renderSetupPage() {
+    _TTS._init();
+    _loadHistory();
+
+    var levelGrid = document.getElementById('aijs-level-grid');
+    var modeList  = document.getElementById('aijs-mode-list');
+    var startBtn  = document.getElementById('aijs-start-btn');
+    var creditInfo= document.getElementById('aijs-start-credit-info');
+
+    if (!levelGrid || !modeList || !startBtn) return;
+
+    // Update level buttons to show N5/N4 only
+    levelGrid.innerHTML =
+        '<button class="aijs-level-btn" data-level="n5">N5 – Pemula</button>' +
+        '<button class="aijs-level-btn" data-level="n4">N4 – Dasar</button>';
+
+    var selLevel = null, selMode = null;
+
+    function updateStart() {
+        var credits = window.AI_CREDIT_STATE?.remaining ?? '?';
+        if (selLevel && selMode) {
+            var cost = MODES[selMode]?.credit || '?';
+            startBtn.disabled = false;
+            // Get live credit balance
+            if (creditInfo) {
+                creditInfo.textContent = 'Sesi ini membutuhkan ' + cost + ' credit · Memuat saldo...';
+                if (window.AI_SENSEI?.getCredits) {
+                    AI_SENSEI.getCredits().then(function(c){
+                        if (creditInfo) creditInfo.textContent =
+                            'Sesi ini membutuhkan ' + cost + ' credit · Sisa credit kamu: ' + (c.remaining??'?');
+                    }).catch(function(){});
+                }
+            }
+        } else {
+            startBtn.disabled = true;
+            if (creditInfo) creditInfo.textContent = 'Pilih level dan mode untuk memulai.';
+        }
+    }
+
+    levelGrid.querySelectorAll('.aijs-level-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            levelGrid.querySelectorAll('.aijs-level-btn').forEach(function(b){ b.classList.remove('active'); });
+            btn.classList.add('active');
+            selLevel = btn.dataset.level;
+            updateStart();
+        });
+    });
+
+    modeList.querySelectorAll('.aijs-mode-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            modeList.querySelectorAll('.aijs-mode-btn').forEach(function(b){ b.classList.remove('active'); });
+            btn.classList.add('active');
+            selMode = btn.dataset.mode;
+            updateStart();
+        });
+    });
+
+    startBtn.addEventListener('click', async function() {
+        if (!selLevel || !selMode) return;
+
+        var cfg    = MODES[selMode];
+        startBtn.disabled = true;
+        startBtn.textContent = 'Memeriksa credit...';
+
+        try {
+            // Check credits
+            var credits = { remaining: 0 };
+            if (window.AI_SENSEI?.getCredits) {
+                credits = await AI_SENSEI.getCredits().catch(function(){ return {remaining:0}; });
+            }
+            if ((credits.remaining ?? 0) < cfg.credit) {
+                alert('Credit tidak cukup. Saldo: ' + (credits.remaining||0) + ', dibutuhkan: ' + cfg.credit);
+                return;
+            }
+
+            // Navigate to session page (shows loading)
+            window.navigateTo && navigateTo('ai-jft-session');
+            startBtn.textContent = 'Membuat soal...';
+
+            // Generate (two API calls)
+            var session = await generateSession(selLevel, selMode);
+
+            // Deduct credit AFTER successful generation
+            if (window.AI_SENSEI?.deductCredit) {
+                await AI_SENSEI.deductCredit(cfg.credit);
+            }
+
+            // Start session
+            _startSession(session.levelId, session.modeId, session.sections, session.flat);
+
+        } catch(e) {
+            console.error('[AI_JFT] generate error:', e);
+            var msg = e.message || 'Gagal membuat soal.';
+            alert('❌ ' + msg + '\n\nCredit TIDAK terpotong. Silakan coba lagi.');
+            window.navigateTo && navigateTo('ai-jft-setup');
+        } finally {
+            startBtn.disabled = false;
+            startBtn.textContent = 'Mulai Simulasi →';
+        }
+    });
+
+    updateStart();
+}
+
+// ─────────────────────────────────────────────────────────────────
+// SESSION PAGE (called by app.js when navigating to session)
+// ─────────────────────────────────────────────────────────────────
+function renderSessionPage() {
+    // Exit button
+    var exitBtn = document.getElementById('aijs-session-exit-btn');
+    if (exitBtn) {
+        exitBtn.onclick = function() {
+            if (_tid) clearInterval(_tid);
+            _S = null;
+            window.navigateTo && navigateTo('ai-jft-setup');
+        };
+    }
+    // If session already active (e.g. re-render after navigate back), resume
+    if (_S && _S.flat && _S.currentIdx < _S.flat.length) {
+        injectTimerHero();
+        renderCurrentQuestion();
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// PUBLIC API
+// ─────────────────────────────────────────────────────────────────
+return {
+    renderSetupPage:   renderSetupPage,
+    renderSessionPage: renderSessionPage,
+};
+
+})(); // end AI_JFT_SIM IIFE

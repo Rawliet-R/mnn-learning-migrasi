@@ -1,799 +1,191 @@
-/* ═══════════════════════════════════════════════════════════
-   MNN Learning — 🤖 AI JFT Simulation
-   ai-jft-sim.css — Phase 1
-   Tidak mengubah styles.css / ai-sensei.css yang sudah ada.
-   Semua class diberi prefix "aijs-" agar tidak bertabrakan
-   dengan class manapun yang sudah ada di aplikasi.
-   ═══════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════
+   MNN Learning — AI JFT Simulation CSS  (REBUILT v4.0)
+   ═══════════════════════════════════════════════════════════════════ */
 
-:root {
-  --aijs-purple:      #6c63ff;
-  --aijs-purple-soft:  rgba(108,99,255,.12);
-  --aijs-purple-soft2: rgba(108,99,255,.24);
-  --aijs-teal:        #48cfad;
-  --aijs-correct:     #34d399;
-  --aijs-correct-soft: rgba(52,211,153,.14);
-  --aijs-wrong:       #f87171;
-  --aijs-wrong-soft:  rgba(248,113,113,.14);
-}
+/* ── SETUP PAGE ─────────────────────────────────────────────────── */
+.aijs-back-link { background:none; border:none; color:var(--accent,#4f8ef7); cursor:pointer; font-size:14px; padding:0; margin-bottom:8px; }
+.aijs-page-title { font-size:22px; font-weight:700; margin:4px 0 4px; }
+.aijs-page-sub   { font-size:13px; opacity:.6; margin:0 0 20px; }
 
-/* ─────────────────────────────────────────────
-   ENTRY CARD — di dalam #page-simulasi,
-   tepat di bawah card "JFT Basic Full Simulation"
-───────────────────────────────────────────── */
-.aijs-card {
-  background: var(--bg-card);
-  border: 1px solid var(--aijs-purple-soft2);
-  border-radius: 18px;
-  padding: 18px;
-  box-shadow: var(--shadow-card);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  font-family: 'DM Sans', sans-serif;
-}
-.aijs-card-header { display: flex; align-items: center; gap: 12px; }
-.aijs-card-icon {
-  flex-shrink: 0;
-  width: 48px; height: 48px;
-  border-radius: 14px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 24px;
-  background: linear-gradient(135deg, var(--aijs-purple-soft), rgba(72,207,173,.10));
-}
-.aijs-card-heading { flex: 1; min-width: 0; }
-.aijs-card-title {
-  font-size: 16px; font-weight: 800; color: var(--text-primary);
-  letter-spacing: -.1px; display: flex; align-items: center; gap: 6px;
-}
-.aijs-card-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; line-height: 1.4; }
-.aijs-card-badge {
-  flex-shrink: 0;
-  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px;
-  color: var(--aijs-purple);
-  background: var(--aijs-purple-soft);
-  border: 1px solid var(--aijs-purple-soft2);
-  border-radius: 4px;
-  padding: 3px 6px;
-  align-self: flex-start;
-}
-.aijs-card-hint {
-  font-size: 12px; color: var(--text-secondary); line-height: 1.6;
-  background: var(--bg-card-hover);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 10px 12px;
-}
+.aijs-setup-card { background:var(--bg-card,#1e1e2e); border-radius:16px; padding:20px; margin-bottom:16px; }
+.aijs-setup-label { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:1px; opacity:.5; margin-bottom:10px; }
 
-/* Generic primary button — dipakai di card, setup page, dst */
+/* Level buttons */
+.aijs-level-grid { display:flex; gap:10px; flex-wrap:wrap; }
+.aijs-level-btn  {
+    flex:1; min-width:100px; padding:12px 16px; border-radius:12px;
+    border:1.5px solid var(--border,rgba(255,255,255,.12));
+    background:transparent; color:inherit; font-size:14px; font-weight:600;
+    cursor:pointer; transition:all .18s;
+}
+.aijs-level-btn:hover  { border-color:var(--accent,#4f8ef7); background:rgba(79,142,247,.08); }
+.aijs-level-btn.active { border-color:var(--accent,#4f8ef7); background:rgba(79,142,247,.15); color:var(--accent,#4f8ef7); }
+
+/* Mode buttons */
+.aijs-mode-list { display:flex; flex-direction:column; gap:8px; }
+.aijs-mode-btn  {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:14px 18px; border-radius:12px;
+    border:1.5px solid var(--border,rgba(255,255,255,.12));
+    background:transparent; color:inherit; cursor:pointer; transition:all .18s;
+    text-align:left;
+}
+.aijs-mode-btn:hover  { border-color:var(--accent,#4f8ef7); background:rgba(79,142,247,.06); }
+.aijs-mode-btn.active { border-color:var(--accent,#4f8ef7); background:rgba(79,142,247,.12); }
+.aijs-mode-name   { font-size:15px; font-weight:700; }
+.aijs-mode-detail { font-size:12px; opacity:.55; margin-top:2px; }
+.aijs-mode-cost   { font-size:13px; font-weight:600; color:var(--accent,#4f8ef7);
+                    background:rgba(79,142,247,.12); padding:4px 10px; border-radius:20px; }
+
+/* Credit info + Start button */
+.aijs-credit-info { font-size:13px; opacity:.6; text-align:center; margin:14px 0 10px; }
 .aijs-btn {
-  width: 100%;
-  padding: 14px;
-  border: none;
-  border-radius: 14px;
-  background: linear-gradient(135deg, var(--aijs-purple), var(--aijs-teal));
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 800;
-  font-family: 'DM Sans', sans-serif;
-  letter-spacing: -.1px;
-  cursor: pointer;
-  transition: filter .15s ease, transform .12s ease, opacity .15s ease;
-  box-shadow: 0 6px 18px rgba(108,99,255,.28);
+    display:block; width:100%; padding:15px; border-radius:14px; border:none;
+    background:linear-gradient(135deg,#6b6ef7,#4eefc8); color:#fff;
+    font-size:16px; font-weight:700; cursor:pointer; transition:opacity .18s;
+    margin-top:8px;
 }
-.aijs-btn:active { transform: scale(.98); filter: brightness(.96); }
-.aijs-btn:disabled {
-  opacity: .45;
-  cursor: not-allowed;
-  box-shadow: none;
-  transform: none;
+.aijs-btn:disabled { opacity:.4; cursor:not-allowed; }
+.aijs-btn:hover:not(:disabled) { opacity:.88; }
+.aijs-btn-ghost {
+    display:block; width:100%; padding:12px; border-radius:14px;
+    border:1px solid var(--border,rgba(255,255,255,.12)); background:transparent;
+    color:inherit; font-size:14px; cursor:pointer; transition:background .15s; margin-top:8px;
 }
-.aijs-btn-secondary {
-  width: 100%;
-  padding: 13px;
-  border-radius: 14px;
-  border: 1px solid var(--border-strong);
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 700;
-  font-family: 'DM Sans', sans-serif;
-  cursor: pointer;
-}
+.aijs-btn-ghost:hover { background:rgba(255,255,255,.06); }
 
-/* ─────────────────────────────────────────────
-   SETUP PAGE — #page-ai-jft-setup
-───────────────────────────────────────────── */
-.aijs-back-link {
-  background: none; border: none; padding: 0; margin-bottom: 8px;
-  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
-  color: var(--aijs-purple); cursor: pointer;
-}
-.aijs-page-title { font-size: 20px; font-weight: 700; color: var(--text-primary); }
-.aijs-page-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+/* History */
+.aijs-history-card  { background:var(--bg-card,#1e1e2e); border-radius:16px; padding:20px; }
+.aijs-section-title { font-size:15px; font-weight:700; margin-bottom:12px; }
+.aijs-history-item  { display:flex; justify-content:space-between; align-items:center;
+                       padding:10px 0; border-bottom:1px solid var(--border,rgba(255,255,255,.08)); }
+.aijs-history-item:last-child { border-bottom:none; }
+.aijs-history-meta  { font-size:13px; opacity:.7; }
+.aijs-history-score { font-size:14px; font-weight:700; color:var(--accent,#4f8ef7); }
+.aijs-history-empty { font-size:13px; opacity:.5; text-align:center; padding:16px 0; }
 
-.aijs-setup-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-strong);
-  border-radius: 18px;
-  padding: 18px;
-  box-shadow: var(--shadow-card);
-  display: flex;
-  flex-direction: column;
-}
-.aijs-setup-label {
-  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-  color: var(--text-muted); margin-bottom: 10px;
-}
-
-.aijs-level-grid {
-  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;
-}
-.aijs-level-btn {
-  padding: 13px 10px;
-  border-radius: 12px;
-  border: 1px solid var(--border-strong);
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 13px; font-weight: 700;
-  cursor: pointer;
-  transition: background .15s ease, border-color .15s ease, color .15s ease;
-}
-.aijs-level-btn.aijs-selected {
-  background: var(--aijs-purple-soft);
-  border-color: var(--aijs-purple);
-  color: var(--aijs-purple);
-}
-
-.aijs-mode-list { display: flex; flex-direction: column; gap: 10px; }
-.aijs-mode-btn {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  width: 100%;
-  padding: 13px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--border-strong);
-  background: var(--bg-card-hover);
-  cursor: pointer;
-  text-align: left;
-  font-family: 'DM Sans', sans-serif;
-  transition: background .15s ease, border-color .15s ease;
-}
-.aijs-mode-btn.aijs-selected {
-  background: var(--aijs-purple-soft);
-  border-color: var(--aijs-purple);
-}
-.aijs-mode-name { font-size: 13px; font-weight: 800; color: var(--text-primary); }
-.aijs-mode-detail { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-.aijs-mode-cost {
-  flex-shrink: 0;
-  font-size: 12px; font-weight: 800;
-  color: var(--aijs-purple);
-  background: var(--aijs-purple-soft);
-  border-radius: 99px;
-  padding: 4px 10px;
-  white-space: nowrap;
-}
-
-.aijs-credit-info {
-  font-size: 11.5px; color: var(--text-muted); text-align: center;
-  margin: 14px 0 10px;
-  line-height: 1.5;
-}
-.aijs-credit-info strong { color: var(--text-secondary); }
-
-.aijs-history-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-strong);
-  border-radius: 18px;
-  padding: 18px;
-  box-shadow: var(--shadow-card);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.aijs-section-title { font-size: 14px; font-weight: 800; color: var(--text-primary); }
-.aijs-history-empty {
-  font-size: 12px; color: var(--text-muted); text-align: center; padding: 18px 0;
-}
-.aijs-history-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 11px 0;
-  border-top: 1px solid var(--border);
-}
-.aijs-history-item:first-of-type { border-top: none; }
-.aijs-history-info { flex: 1; min-width: 0; }
-.aijs-history-meta { font-size: 12.5px; font-weight: 700; color: var(--text-primary); }
-.aijs-history-date { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
-.aijs-history-score {
-  flex-shrink: 0;
-  font-size: 13px; font-weight: 800;
-  color: var(--aijs-purple);
-  min-width: 42px; text-align: right;
-}
-.aijs-history-score.aijs-pending { color: var(--text-muted); font-weight: 600; font-size: 11px; }
-.aijs-history-retry {
-  flex-shrink: 0;
-  font-size: 11px; font-weight: 700;
-  color: var(--aijs-purple);
-  background: var(--aijs-purple-soft);
-  border: 1px solid var(--aijs-purple-soft2);
-  border-radius: 99px;
-  padding: 6px 10px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-/* ─────────────────────────────────────────────
-   GENERATING OVERLAY — saat AI membuat sesi
-───────────────────────────────────────────── */
-#aijs-generating-overlay {
-  position: fixed; inset: 0; z-index: 2000;
-  background: rgba(10,10,16,.82);
-  display: flex; align-items: center; justify-content: center;
-  flex-direction: column; gap: 16px;
-  text-align: center; padding: 24px;
-}
-.aijs-gen-spinner {
-  width: 40px; height: 40px;
-  border: 3px solid rgba(255,255,255,.18);
-  border-top-color: var(--aijs-purple);
-  border-radius: 50%;
-  animation: aijs-spin .7s linear infinite;
-}
-@keyframes aijs-spin { to { transform: rotate(360deg); } }
-.aijs-gen-text { color: #f0f0f5; font-size: 13px; font-weight: 600; font-family: 'DM Sans', sans-serif; }
-.aijs-gen-sub { color: rgba(255,255,255,.55); font-size: 11.5px; font-family: 'DM Sans', sans-serif; max-width: 260px; }
-
-/* ─────────────────────────────────────────────
-   SESSION PAGE — #page-ai-jft-session
-   Full-screen takeover, sama pendekatannya dengan #page-jft-exam
-───────────────────────────────────────────── */
-#page-ai-jft-session.active {
-  position: fixed;
-  inset: 0;
-  z-index: 500;
-  height: 100dvh;
-  margin: 0; padding: 0; gap: 0;
-  background: var(--bg-base);
-  display: flex;
-  flex-direction: column;
-}
+/* ── SESSION TOPBAR ─────────────────────────────────────────────── */
 .aijs-session-topbar {
-  flex-shrink: 0;
-  display: flex; align-items: center; gap: 10px;
-  height: 52px;
-  padding: env(safe-area-inset-top) 14px 0;
-  background: var(--bg-elevated);
-  border-bottom: 1px solid var(--border-strong);
+    display:flex; align-items:center; gap:10px; padding:10px 16px;
+    border-bottom:1px solid var(--border,rgba(255,255,255,.08));
+    background:var(--bg-base,#0f0f1a);
+    position:sticky; top:0; z-index:100;
 }
 .aijs-session-back {
-  flex-shrink: 0;
-  width: 30px; height: 30px;
-  border-radius: 50%;
-  border: none;
-  background: var(--bg-card-hover);
-  color: var(--text-secondary);
-  font-size: 14px;
-  cursor: pointer;
+    background:none; border:none; color:inherit; font-size:18px; cursor:pointer;
+    padding:4px 8px; opacity:.7; flex-shrink:0;
 }
-.aijs-session-progress-wrap { flex: 1; min-width: 0; }
-.aijs-session-section-label {
-  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
-  color: var(--aijs-purple); margin-bottom: 4px;
-}
-.aijs-session-progress-track {
-  height: 5px; border-radius: 99px; background: var(--border-strong); overflow: hidden;
-}
-.aijs-session-progress-fill {
-  height: 100%; border-radius: 99px;
-  background: linear-gradient(90deg, var(--aijs-purple), var(--aijs-teal));
-  transition: width .3s ease;
-}
-.aijs-session-counter {
-  flex-shrink: 0;
-  font-size: 11px; font-weight: 700; color: var(--text-muted); white-space: nowrap;
-}
-.aijs-session-body {
-  flex: 1; min-height: 0; overflow-y: auto;
-  padding: 20px 16px calc(24px + env(safe-area-inset-bottom, 0px));
-  display: flex; flex-direction: column; gap: 16px;
-}
+.aijs-session-progress-wrap { flex:1; min-width:0; }
+.aijs-session-section-label { font-size:11px; font-weight:600; opacity:.6; margin-bottom:4px; text-transform:uppercase; letter-spacing:.5px; }
+.aijs-session-progress-track { height:4px; background:rgba(255,255,255,.08); border-radius:2px; }
+.aijs-session-progress-fill  { height:100%; background:linear-gradient(90deg,#6b6ef7,#4eefc8); border-radius:2px; transition:width .3s; }
+.aijs-session-topbar-right { display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0; }
+.aijs-timer-display    { font-size:14px; font-weight:700; font-variant-numeric:tabular-nums; }
+.aijs-session-counter  { font-size:11px; opacity:.5; margin-top:2px; }
 
+/* ── TIMER HERO ─────────────────────────────────────────────────── */
+.aijs-timer-hero {
+    text-align:center; padding:10px 20px 14px;
+    border-bottom:1px solid var(--border,rgba(255,255,255,.08));
+    background:var(--bg-base,#0f0f1a);
+}
+.aijs-timer-hero-time {
+    font-size:clamp(38px,8vw,62px); font-weight:800; line-height:1;
+    font-variant-numeric:tabular-nums; letter-spacing:-1px;
+}
+.aijs-timer-hero-time.aijs-timer-hero-warning { color:#ff5a5a; }
+.aijs-timer-hero-label   { font-size:10px; letter-spacing:2px; text-transform:uppercase; opacity:.45; margin:3px 0 6px; }
+.aijs-timer-hero-section { font-size:13px; font-weight:600; }
+.aijs-timer-hero-pos     { font-size:11px; opacity:.45; margin-top:2px; }
+
+/* ── SESSION BODY ───────────────────────────────────────────────── */
+.aijs-session-body { padding:16px; max-width:780px; margin:0 auto; }
+
+/* Loading */
+.aijs-session-loading { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; }
+.aijs-gen-spinner {
+    width:36px; height:36px; border-radius:50%;
+    border:3px solid rgba(79,142,247,.2); border-top-color:#4f8ef7;
+    animation:aijs-spin .8s linear infinite;
+}
+@keyframes aijs-spin { to { transform:rotate(360deg); } }
+
+/* Question card */
 .aijs-q-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-strong);
-  border-radius: 16px;
-  padding: 18px;
-  box-shadow: var(--shadow-card);
+    background:var(--bg-card,#1a1a2e); border-radius:14px;
+    padding:18px 20px; margin-bottom:14px; font-size:16px; line-height:1.65;
 }
-.aijs-q-text {
-  font-size: 15px; font-weight: 600; color: var(--text-primary);
-  line-height: 1.65; white-space: pre-wrap;
-}
+.aijs-q-text { white-space:pre-wrap; word-break:break-word; }
+.aijs-choukai-q-text { font-size:15px; }
 
-.aijs-option-list { display: flex; flex-direction: column; gap: 10px; }
-.aijs-option-btn {
-  width: 100%;
-  padding: 13px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--border-strong);
-  background: var(--bg-card);
-  color: var(--text-primary);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 13.5px; font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-  transition: background .15s ease, border-color .15s ease, opacity .15s ease;
+/* Options */
+.aijs-option-list { display:flex; flex-direction:column; gap:9px; margin-bottom:14px; }
+.aijs-option-btn  {
+    width:100%; padding:14px 18px; border-radius:12px; text-align:left;
+    border:1.5px solid var(--border,rgba(255,255,255,.1));
+    background:var(--bg-card,#1a1a2e); color:inherit; font-size:15px;
+    cursor:pointer; transition:all .15s; line-height:1.5;
 }
-.aijs-option-btn:active { transform: scale(.99); }
-.aijs-option-btn.aijs-opt-correct {
-  background: var(--aijs-correct-soft);
-  border-color: var(--aijs-correct);
-  color: var(--aijs-correct);
-}
-.aijs-option-btn.aijs-opt-wrong {
-  background: var(--aijs-wrong-soft);
-  border-color: var(--aijs-wrong);
-  color: var(--aijs-wrong);
-}
-.aijs-option-btn.aijs-opt-disabled { cursor: default; opacity: .55; }
-.aijs-option-btn.aijs-opt-disabled:active { transform: none; }
+.aijs-option-btn:hover:not(:disabled)  { border-color:var(--accent,#4f8ef7); background:rgba(79,142,247,.08); }
+.aijs-option-btn.aijs-opt-correct { border-color:#4caf50; background:rgba(76,175,80,.12); color:#4caf50; font-weight:600; }
+.aijs-option-btn.aijs-opt-wrong   { border-color:#f44336; background:rgba(244,67,54,.1);  color:#f44336; }
+.aijs-option-btn:disabled { cursor:default; }
 
-.aijs-feedback-box {
-  border-radius: 14px;
-  padding: 14px;
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: var(--text-secondary);
-  border: 1px solid var(--border);
-  background: var(--bg-card-hover);
+/* Feedback */
+.aijs-feedback {
+    border-radius:12px; padding:14px 16px; margin-bottom:12px;
+    font-size:14px; line-height:1.6;
 }
-.aijs-feedback-title {
-  font-size: 13px; font-weight: 800; margin-bottom: 6px;
-  display: flex; align-items: center; gap: 6px;
-}
-.aijs-feedback-title.aijs-fb-correct { color: var(--aijs-correct); }
-.aijs-feedback-title.aijs-fb-wrong   { color: var(--aijs-wrong); }
+.aijs-fb-correct { background:rgba(76,175,80,.12);  border:1px solid rgba(76,175,80,.3);  }
+.aijs-fb-wrong   { background:rgba(244,67,54,.08); border:1px solid rgba(244,67,54,.25); }
+.aijs-fb-correct b { color:#4caf50; }
+.aijs-fb-wrong   b { color:#f44336; }
 
-/* ── Summary / hasil akhir ── */
-.aijs-summary-wrap { display: flex; flex-direction: column; gap: 16px; align-items: center; text-align: center; padding-top: 8px; }
-.aijs-summary-score {
-  font-size: 44px; font-weight: 800;
-  background: linear-gradient(135deg, var(--aijs-purple), var(--aijs-teal));
-  -webkit-background-clip: text; background-clip: text; color: transparent;
+/* Next button */
+.aijs-next-btn {
+    width:100%; padding:15px; border-radius:14px; border:none;
+    background:linear-gradient(135deg,#6b6ef7,#4eefc8); color:#fff;
+    font-size:16px; font-weight:700; cursor:pointer; transition:opacity .15s;
 }
-.aijs-summary-label { font-size: 12px; color: var(--text-muted); margin-top: -10px; }
-.aijs-summary-sections {
-  width: 100%; display: flex; flex-direction: column; gap: 8px;
-  background: var(--bg-card); border: 1px solid var(--border-strong);
-  border-radius: 14px; padding: 14px;
-}
-.aijs-summary-row { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; }
-.aijs-summary-row-name { color: var(--text-secondary); font-weight: 600; }
-.aijs-summary-row-score { color: var(--text-primary); font-weight: 800; }
-.aijs-summary-actions { width: 100%; display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.aijs-next-btn:hover { opacity:.88; }
 
-/* ── Loading state inside session body (saat retry memuat dari Firestore) ── */
-.aijs-session-loading {
-  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 12px; color: var(--text-muted); font-size: 12.5px;
-}
+/* ── CHOUKAI ─────────────────────────────────────────────────────── */
+.aijs-choukai-wrap { display:flex; flex-direction:column; gap:12px; }
+.aijs-choukai-player { }
 
-/* ══════════════════════════════════════════════════════
-   PHASE 2 — Timer, Image Framework, Choukai, History+
-   ══════════════════════════════════════════════════════ */
+.aijs-choukai-play-area { display:flex; flex-direction:column; align-items:center; gap:10px; padding:16px; }
+.aijs-play-btn {
+    display:inline-flex; align-items:center; gap:10px;
+    background:var(--accent,#4f8ef7); color:#fff; border:none;
+    border-radius:12px; padding:14px 32px; font-size:16px; font-weight:700;
+    cursor:pointer; min-width:200px; justify-content:center;
+    transition:background .18s, transform .1s, opacity .18s;
+}
+.aijs-play-btn:hover:not(:disabled) { background:#3a79e6; transform:translateY(-1px); }
+.aijs-play-btn:disabled { opacity:.55; cursor:not-allowed; transform:none; }
+.aijs-play-hint  { font-size:12px; font-weight:500; opacity:.75; }
+.aijs-choukai-hint   { font-size:13px; opacity:.6; text-align:center; margin:0; }
+.aijs-choukai-noscript { font-size:13px; opacity:.6; text-align:center; padding:12px 0; }
 
-/* Topbar right cluster */
-.aijs-session-topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-/* Timer display */
-.aijs-timer-display {
-  font-size: 13px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-secondary);
-  background: var(--bg-card-hover);
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  padding: 3px 9px;
-  min-width: 46px;
-  text-align: center;
-  letter-spacing: 0.5px;
-  transition: color .2s, background .2s, border-color .2s;
-}
-.aijs-timer-display.aijs-timer-warning {
-  color: #ff6b6b;
-  border-color: #ff6b6b55;
-  background: #ff6b6b15;
-  animation: aijs-timer-pulse 1s ease-in-out infinite;
-}
-@keyframes aijs-timer-pulse {
-  0%,100% { opacity: 1; }
-  50%      { opacity: .6; }
-}
-
-/* Image question visual block */
-.aijs-q-visual {
-  margin-bottom: 14px;
-}
-
-/* Image placeholder */
-.aijs-img-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  background: var(--bg-card-hover);
-  border: 1.5px dashed var(--border-strong);
-  border-radius: 12px;
-  padding: 28px 20px;
-  color: var(--text-secondary);
-  text-align: center;
-}
-.aijs-img-placeholder-icon { font-size: 32px; }
-.aijs-img-placeholder-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-.aijs-img-placeholder-hint { font-size: 11px; opacity: .6; }
-
-/* Actual image asset */
-.aijs-img-wrap { border-radius: 12px; overflow: hidden; }
-.aijs-img-asset {
-  width: 100%;
-  max-height: 300px;
-  object-fit: contain;
-  display: block;
-  border-radius: 12px;
-}
-
-/* Choukai badge */
-.aijs-choukai-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--bg-card-hover);
-  border: 1px solid var(--border-strong);
-  border-radius: 10px;
-  padding: 9px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-bottom: 12px;
-}
-
-/* History duration chip */
-.aijs-history-dur {
-  display: inline-flex;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  background: var(--bg-card-hover);
-  border-radius: 6px;
-  padding: 2px 7px;
-  margin-left: 6px;
-  vertical-align: middle;
-}
-
-/* ══════════════════════════════════════════════════════
-   CHOUKAI — Audio Player & Dialog UI
-   ══════════════════════════════════════════════════════ */
-
-.aijs-choukai-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.aijs-choukai-question-text {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-  background: var(--bg-card-hover);
-  border: 1px solid var(--border-strong);
-  border-radius: 12px;
-  padding: 14px 16px;
-  line-height: 1.6;
-}
-
-/* Spinner / playing state */
-.aijs-choukai-spinner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 20px;
-}
-
-.aijs-choukai-status {
-  font-size: 13px;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-/* Sound wave animation */
-.aijs-tts-wave {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 28px;
-}
-.aijs-tts-wave span {
-  display: block;
-  width: 4px;
-  border-radius: 2px;
-  background: #6c63ff;
-  animation: aijs-wave-bounce 0.9s ease-in-out infinite;
-}
-.aijs-tts-wave span:nth-child(1) { height: 10px; animation-delay: 0.0s; }
-.aijs-tts-wave span:nth-child(2) { height: 20px; animation-delay: 0.1s; }
-.aijs-tts-wave span:nth-child(3) { height: 28px; animation-delay: 0.2s; }
-.aijs-tts-wave span:nth-child(4) { height: 18px; animation-delay: 0.3s; }
-.aijs-tts-wave span:nth-child(5) { height: 10px; animation-delay: 0.4s; }
-@keyframes aijs-wave-bounce {
-  0%,100% { transform: scaleY(0.5); opacity: .5; }
-  50%      { transform: scaleY(1);   opacity: 1;  }
-}
-
-/* Script / dialog box */
-.aijs-script-box {
-  background: var(--bg-card-hover);
-  border: 1px solid var(--border-strong);
-  border-radius: 12px;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.aijs-script-line {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-.aijs-script-icon {
-  font-size: 20px;
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-.aijs-script-text {
-  font-size: 14px;
-  line-height: 1.65;
-  color: var(--text-primary);
-}
-.aijs-script-male  .aijs-script-text { color: #7eb8ff; }
-.aijs-script-female .aijs-script-text { color: #f7a8c4; }
+/* Script box (revealed after audio) */
+.aijs-script-box  { background:rgba(255,255,255,.04); border-radius:10px; padding:12px 16px; }
+.aijs-script-line { display:flex; align-items:flex-start; gap:8px; padding:5px 0; font-size:15px; line-height:1.55; }
+.aijs-script-icon { font-size:18px; flex-shrink:0; }
 
 /* Replay button */
 .aijs-replay-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-  padding: 7px 16px;
-  border-radius: 9px;
-  border: 1px solid var(--border-strong);
-  background: var(--bg-card-hover);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background .15s, color .15s;
+    display:inline-flex; align-items:center; gap:8px; margin-top:8px;
+    background:transparent; border:1px solid rgba(255,255,255,.18);
+    border-radius:8px; padding:8px 18px; font-size:13px; font-weight:600;
+    color:inherit; cursor:pointer; transition:background .15s;
 }
-.aijs-replay-btn:hover:not(:disabled) {
-  background: #6c63ff22;
-  color: #a89cff;
-  border-color: #6c63ff55;
-}
-.aijs-replay-btn:disabled { opacity: .5; cursor: not-allowed; }
+.aijs-replay-btn:hover:not(:disabled) { background:rgba(255,255,255,.07); }
+.aijs-replay-btn:disabled { opacity:.4; cursor:not-allowed; }
 
-/* TTS warning banner */
-.aijs-tts-warn {
-  background: #ff6b6b12;
-  border: 1px solid #ff6b6b44;
-  border-radius: 10px;
-  color: #ff9f9f;
-  font-size: 12px;
-  padding: 10px 14px;
-  line-height: 1.5;
-}
-
-/* ══════════════════════════════════════════════════════
-   V2 — Dokkai docType badge
-   ══════════════════════════════════════════════════════ */
-
-.aijs-doc-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: var(--bg-card-hover);
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-bottom: 10px;
-  letter-spacing: 0.3px;
-}
-
-/* ══════════════════════════════════════════════════════
-   V3 — Timer Hero (besar, di atas soal)
-   ══════════════════════════════════════════════════════ */
-
-.aijs-timer-hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  background: var(--bg-card-hover);
-  border: 1px solid var(--border-strong);
-  border-radius: 14px;
-  padding: 16px 20px 12px;
-  margin-bottom: 16px;
-  text-align: center;
-}
-
-.aijs-timer-hero-time {
-  font-size: 42px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 2px;
-  color: var(--text-primary);
-  line-height: 1;
-  transition: color .2s;
-}
-.aijs-timer-hero-time.aijs-timer-hero-warning {
-  color: #ff6b6b;
-  animation: aijs-timer-pulse 1s ease-in-out infinite;
-}
-
-.aijs-timer-hero-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  margin-top: 2px;
-}
-
-.aijs-timer-hero-section {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-top: 8px;
-}
-
-.aijs-timer-hero-pos {
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-
-/* ══ Choukai Play Button (added fix) ══════════════════════════════════ */
-.aijs-choukai-play-area {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 24px 16px 12px;
-}
-
-.aijs-play-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  background: #4f8ef7;
-  color: #fff;
-  border: none;
-  border-radius: 12px;
-  padding: 14px 32px;
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background .18s, transform .1s, opacity .18s;
-  min-width: 200px;
-  justify-content: center;
-}
-
-.aijs-play-btn:hover:not(:disabled) { background: #3a79e6; transform: translateY(-1px); }
-.aijs-play-btn:active:not(:disabled) { transform: translateY(0); }
-.aijs-play-btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
-
-.aijs-play-hint { font-size: 12px; font-weight: 500; opacity: .75; }
-
-.aijs-choukai-hint {
-  font-size: 13px;
-  opacity: .65;
-  text-align: center;
-  margin: 0;
-}
-
-.aijs-choukai-noscript {
-  font-size: 13px;
-  opacity: .65;
-  text-align: center;
-  padding: 12px 0;
-}
-
-.aijs-replay-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: transparent;
-  border: 1px solid rgba(255,255,255,.2);
-  border-radius: 8px;
-  padding: 8px 18px;
-  font-size: 13px;
-  font-weight: 600;
-  color: inherit;
-  cursor: pointer;
-  margin-top: 10px;
-  transition: background .15s;
-}
-.aijs-replay-btn:hover:not(:disabled) { background: rgba(255,255,255,.08); }
-.aijs-replay-btn:disabled { opacity: .4; cursor: not-allowed; }
-
-.aijs-script-box {
-  background: rgba(255,255,255,.05);
-  border-radius: 10px;
-  padding: 12px 16px;
-  margin: 8px 0;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.aijs-script-line {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 4px 0;
-  font-size: 15px;
-  line-height: 1.5;
-}
-
-.aijs-script-icon { font-size: 18px; flex-shrink: 0; }
-
-/* ══ Timer hero fix ════════════════════════════════════════════════════ */
-.aijs-timer-hero {
-  text-align: center;
-  padding: 8px 20px 12px;
-  border-bottom: 1px solid rgba(255,255,255,.08);
-}
-
-.aijs-timer-hero-time {
-  font-size: clamp(36px, 7vw, 56px);
-  font-weight: 800;
-  letter-spacing: -1px;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.aijs-timer-hero-label {
-  font-size: 11px;
-  letter-spacing: 2px;
-  opacity: .5;
-  text-transform: uppercase;
-  margin: 2px 0 6px;
-}
-
-.aijs-timer-hero-section {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.aijs-timer-hero-pos {
-  font-size: 11px;
-  opacity: .5;
-  margin-top: 2px;
-}
-
-.aijs-timer-hero-warning .aijs-timer-hero-time { color: #ff5a5a; }
+/* ── SCORE ───────────────────────────────────────────────────────── */
+.aijs-score-wrap  { text-align:center; padding:24px 16px; }
+.aijs-score-pct   { font-size:clamp(52px,12vw,80px); font-weight:800; color:var(--accent,#4f8ef7); line-height:1; }
+.aijs-score-sub   { font-size:14px; opacity:.55; margin:6px 0 24px; }
+.aijs-score-table { background:var(--bg-card,#1a1a2e); border-radius:14px; padding:6px 16px; margin-bottom:20px; text-align:left; }
+.aijs-score-row   { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.06); font-size:14px; }
+.aijs-score-row:last-child { border-bottom:none; }
