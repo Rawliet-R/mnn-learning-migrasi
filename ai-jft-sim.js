@@ -458,11 +458,12 @@ const AI_JFT_SIM = (() => {
         const user =
             'Buat paket JFT-Basic level "' + levelLabel + '" soal TEPAT: ' +
             'choukai=' + s.choukai + ' | kanji_kotoba=' + s.kanji_kotoba + ' | expression=' + s.expression + ' | dokkai=' + s.dokkai + '\n\n' +
-            'JSON (choukai PERTAMA):\n{"sections":{"choukai":[...],"kanji_kotoba":[...],"expression":[...],"dokkai":[...]}}\n\n' +
+            'JSON output (dokkai PERTAMA — agar tidak terpotong token):\n{"sections":{"dokkai":[...],"kanji_kotoba":[...],"expression":[...],"choukai":[...]}}\n\n' +
             'Format: {"question":"...","options":["A","B","C","D"],"answer":"A","explanation":"..."}\n' +
             'Choukai+: "listeningScript":[{"speaker":"male","text":"..."},...], "maxPlay":2\n' +
             'Dokkai+: "docType":"..."\n\n' +
-            '!!! CHOUKAI WAJIB ADA: buat ' + s.choukai + ' soal dengan listeningScript lengkap !!!\n' +
+            '!!! DOKKAI WAJIB ' + s.dokkai + ' soal — GENERATE DULU sebelum choukai !!!\n' +
+            '!!! CHOUKAI WAJIB ' + s.choukai + ' soal dengan listeningScript !!!\n' +
             'Balas JSON saja.';
         return { system, user };
     }
@@ -482,6 +483,9 @@ const AI_JFT_SIM = (() => {
     function _isValidQuestion(q, sectionHint) {
         if (!q || typeof q.question !== 'string') return false;
         var qt = q.question.trim();
+        // Strip prefix Q="..." atau Q='...' yang AI sering tambahkan dari contoh prompt
+        qt = qt.replace(/^[Qq]\s*[:=]\s*["']/, '').replace(/["']\s*$/, '').trim();
+        if (qt !== q.question.trim()) q.question = qt; // koreksi di objek
         if (!qt || qt.length < 3) return false;
         if (!Array.isArray(q.options) || q.options.length !== 4) return false;
         if (!q.options.every(function(o){ return typeof o === 'string' && o.trim(); })) return false;
