@@ -7,7 +7,7 @@
 //  Generation: DUA API call terpisah (text + choukai) → tidak ada truncation
 // ═══════════════════════════════════════════════════════════════════
 
-const AI_JFT_SIM = (() => {
+var AI_JFT_SIM = (() => {
 'use strict';
 
 // ─────────────────────────────────────────────────────────────────
@@ -997,3 +997,4 @@ return {
 };
 
 })(); // end AI_JFT_SIM IIFE
+window.AI_JFT_SIM = AI_JFT_SIM;
