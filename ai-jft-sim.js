@@ -13,7 +13,7 @@ var AI_JFT_SIM = (() => {
 // ─────────────────────────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────────────────────────
-const MODEL = 'anthropic/claude-3-5-haiku';
+const MODEL = 'openai/gpt-4o-mini';
 
 const SECTION_ORDER  = ['kanji_kotoba','expression','choukai','dokkai'];
 

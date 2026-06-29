@@ -99,7 +99,7 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  const { messages, model = 'anthropic/claude-3-5-haiku', max_tokens = 3000, response_format, temperature } = payload || {};
+  const { messages, model = 'openai/gpt-4o-mini', max_tokens = 3000, response_format, temperature } = payload || {};
   if (!messages || !Array.isArray(messages)) {
     res.status(400).json({ error: 'Field "messages" diperlukan.' });
     return;
