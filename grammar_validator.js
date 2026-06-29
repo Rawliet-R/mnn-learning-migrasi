@@ -54,8 +54,8 @@ const GRAMMAR_VALIDATOR = (() => {
                || n.includes('kbではありません')
                || n.includes('ktbはkb')
                || n.includes('という意味'),
-      test: s => /は.+(?:です|でした|ではありません|じゃありません|ではありませんでした|じゃありませんでした)/.test(s),
-      struct: s => { const m = s.match(/^(.+)は(.+?)(?:です|でした|ではありません|じゃありません|ではありませんでした|じゃありませんでした)$/); return m && hasText(m[1]) && hasText(m[2]); },
+      test: s => /は.+(?:です|でした|ではありません|じゃありません|ではありませんでした|じゃありませんでした|ですか|でしたか|ではありませんか|じゃありませんか)/.test(s),
+      struct: s => { const m = s.match(/^(.+)は(.+?)(?:です|でした|ではありません|じゃありません|ではありませんでした|じゃありませんでした|ですか|でしたか|ではありませんか|じゃありませんか)(?:か)?$/); return m && hasText(m[1]) && hasText(m[2]); },
       hint: 'S は KB です/じゃありません — subjek sebelum は dan predikat sesudahnya.',
       example: 'わたしはがくせいです',
       // FIX v3.0.9: this pattern is very broad (matches any "X は Y です"),
@@ -1025,7 +1025,9 @@ const GRAMMAR_VALIDATOR = (() => {
   // CORE VALIDATE FUNCTION
   // ══════════════════════════════════════════════════════
   function validate(input, grammarTitle) {
-    const s = input.trim();
+    // Strip trailing question/period marks so patterns like struct(s.match(/...$/)) work
+    // with question-form sentences like あなたはかんこく人ですか？
+    const s = input.trim().replace(/[？。！]+$/, '').trim();
     if (!s) return null;
 
     // Must have Japanese characters
