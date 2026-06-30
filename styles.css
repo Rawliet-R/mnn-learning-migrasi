@@ -1207,6 +1207,19 @@
     .grammar-prog-pill.gpp-done { background:rgba(52,211,153,.08); border-color:rgba(52,211,153,.2); color:var(--accent-verb); }
     .grammar-prog-pill.gpp-date { background:rgba(74,158,255,.08); border-color:rgba(74,158,255,.18); color:var(--accent-noun); }
 
+    /* [ADDITIVE — Bunpou UX fix] Ringkasan progress di atas list grammar */
+    .grammar-progress-summary { display:flex; gap:10px; margin-bottom:10px; padding:10px 12px; background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; }
+    .gps-item { font-size:12px; font-weight:600; color:var(--text-muted); }
+    .gps-item.gps-complete { color:var(--accent-verb); }
+
+    /* [ADDITIVE] Tombol quick-drill di header collapsed */
+    .grammar-quick-drill-btn { font-size:10px; font-weight:700; padding:4px 9px; border-radius:7px; border:1px solid var(--accent-verb); background:rgba(52,211,153,.08); color:var(--accent-verb); cursor:pointer; white-space:nowrap; }
+    .grammar-quick-drill-btn:active { background:rgba(52,211,153,.18); }
+
+    /* [ADDITIVE] CTA setelah Reibun Creator jawaban benar */
+    .reibun-next-drill-btn { display:block; width:100%; margin-top:8px; padding:10px; border-radius:10px; border:none; background:var(--accent-verb); color:#fff; font-size:12px; font-weight:700; cursor:pointer; }
+    .reibun-next-drill-btn:active { opacity:.85; }
+
     /* Daily Vocab Review */
     .dvr-card { background:linear-gradient(135deg,rgba(52,211,153,.1),rgba(74,158,255,.07)); border:1px solid rgba(52,211,153,.22); border-radius:18px; padding:16px; margin-bottom:12px; }
     .dvr-header { display:flex; align-items:center; gap:8px; margin-bottom:4px; }

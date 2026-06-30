@@ -1634,7 +1634,18 @@ function renderBunpou() {
     }
 
     const render = () => {
-        container.innerHTML = lesson.bunpou.map((b, bi) => {
+        // [ADDITIVE] Ringkasan progress — dihitung dari STATE.bunpouProgress yang sudah ada,
+        // tidak menulis data baru, hanya membaca & menampilkan.
+        const _totalB = lesson.bunpou.length;
+        const _readN  = lesson.bunpou.reduce((n, _, bi) => n + (getProgress(bi).read ? 1 : 0), 0);
+        const _pracN  = lesson.bunpou.reduce((n, _, bi) => n + (getProgress(bi).practiced ? 1 : 0), 0);
+        const summaryHtml = `
+          <div class="grammar-progress-summary">
+            <span class="gps-item${_readN === _totalB ? ' gps-complete' : ''}">📖 ${_readN}/${_totalB} dibaca</span>
+            <span class="gps-item${_pracN === _totalB ? ' gps-complete' : ''}">✏️ ${_pracN}/${_totalB} dilatih</span>
+          </div>`;
+
+        container.innerHTML = summaryHtml + lesson.bunpou.map((b, bi) => {
             const reibuns = extractReibun(b.p || '');
             const isOpen = openIdx === bi;
             const prog = getProgress(bi);
@@ -1656,6 +1667,9 @@ function renderBunpou() {
                     <span>📌 ${addFuriganaToGrammarTitle(b.title)}</span>
                     <div style="display:flex;align-items:center;gap:8px">
                       ${prog.read ? '<span style="font-size:11px;color:var(--accent-verb)">✓ Dibaca</span>' : ''}
+                      <button class="grammar-quick-drill-btn"
+                        onclick="event.stopPropagation();startBunpouDrill(${bi});markPracticed(${bi})"
+                        title="Langsung latihan pola ini">✏️ Latihan</button>
                       <span style="font-size:11px;color:var(--text-muted)">▼</span>
                     </div>
                   </div>
@@ -1681,7 +1695,10 @@ function renderBunpou() {
             // Creator feedback HTML
             const fb = creatorFeedback[bi];
             const creatorFbHtml = fb !== undefined
-                ? `<div class="reibun-creator-feedback ${fb?.ok ? 'rcf-ok' : 'rcf-warn'}">${fb?.msg || ''}</div>`
+                ? `<div class="reibun-creator-feedback ${fb?.ok ? 'rcf-ok' : 'rcf-warn'}">${fb?.msg || ''}</div>
+                   ${fb?.ok ? `<button class="reibun-next-drill-btn" onclick="startBunpouDrill(${bi});markPracticed(${bi})">
+                       ✓ Paham! Lanjut Latihan →
+                     </button>` : ''}`
                 : '';
 
             return `<div class="grammar-item" id="gi-${bi}">
