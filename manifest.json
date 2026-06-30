@@ -9,7 +9,7 @@
   "display_override": ["window-controls-overlay", "standalone"],
   "background_color": "#0f0f14",
   "theme_color": "#0f0f14",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "lang": "id",
   "dir": "ltr",
   "categories": ["education"],
