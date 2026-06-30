@@ -322,7 +322,12 @@ async function callAPI(system, user, maxTokens) {
     } catch(e) { console.warn('[AI_JFT] getIdToken:', e.message); }
     if (!idToken) throw new Error('Sesi login tidak valid. Silakan login ulang.');
 
-    var body = JSON.stringify({
+    // response_format json_object — paksa gpt-4o-mini output valid JSON selalu
+    var extraParams = {};
+    if (MODEL.indexOf('gpt') !== -1 || MODEL.indexOf('openai') !== -1) {
+        extraParams.response_format = { type: 'json_object' };
+    }
+    var body = JSON.stringify(Object.assign({
         model: MODEL,
         max_tokens: maxTokens,
         temperature: 0.8,
@@ -330,7 +335,7 @@ async function callAPI(system, user, maxTokens) {
             { role: 'system', content: system },
             { role: 'user',   content: user   },
         ],
-    });
+    }, extraParams));
 
     // Escape non-ASCII to avoid proxy ByteString issues
     var safeBody = body.replace(/[\u0080-\uFFFF]/g, function(c){
@@ -368,7 +373,7 @@ async function generateSession(levelId, modeId) {
 
     // ── CALL 1: Text sections ────────────────────────────────────
     var p1 = buildTextPrompt(levelId, s.kanji_kotoba, s.expression, s.dokkai);
-    var tok1 = Math.max(2500, (s.kanji_kotoba + s.expression + s.dokkai) * 220);
+    var tok1 = Math.max(4000, (s.kanji_kotoba + s.expression + s.dokkai) * 300);
     var raw1 = await callAPI(p1.system, p1.user, tok1);
     var sec1 = parseResponse(raw1, ['kanji_kotoba','expression','dokkai']);
     if (!sec1) throw new Error('Format soal (text) tidak valid. Coba lagi.');
@@ -376,7 +381,7 @@ async function generateSession(levelId, modeId) {
     // ── CALL 2: Choukai ──────────────────────────────────────────
     _showLoading('Membuat soal Choukai (audio)...');
     var p2 = buildChoukaiPrompt(levelId, s.choukai);
-    var tok2 = Math.max(2000, s.choukai * 350);
+    var tok2 = Math.max(2500, s.choukai * 450);
     var raw2 = await callAPI(p2.system, p2.user, tok2);
     var sec2 = parseResponse(raw2, ['choukai']);
 
@@ -997,4 +1002,8 @@ return {
 };
 
 })(); // end AI_JFT_SIM IIFE
+// Landscape mode kini ditangani via native CSS @media query (lihat styles.css
+// untuk app shell, ai-jft-sim.css untuk polish khusus simulasi) — tidak butuh
+// JS orientation listener lagi.
+
 window.AI_JFT_SIM = AI_JFT_SIM;

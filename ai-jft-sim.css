@@ -189,3 +189,61 @@
 .aijs-score-table { background:var(--bg-card,#1a1a2e); border-radius:14px; padding:6px 16px; margin-bottom:20px; text-align:left; }
 .aijs-score-row   { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.06); font-size:14px; }
 .aijs-score-row:last-child { border-bottom:none; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   LANDSCAPE MODE — penyempurnaan khusus AI JFT Simulation
+   Trigger: native @media (sama persis dengan breakpoint global di
+   styles.css), TIDAK butuh JS. Saat HP diputar landscape, app shell
+   (sidebar, layout) sudah berubah ke mode desktop oleh styles.css;
+   rule di sini menambah polish khusus halaman simulasi (grid 2 kolom
+   untuk pilihan jawaban, timer hero ringkas horizontal).
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (orientation: landscape) and (max-height: 500px) and (min-width: 600px) {
+    .aijs-session-body {
+        max-width: 900px;
+        padding: 20px 32px;
+    }
+
+    .aijs-q-card {
+        padding: 22px 28px;
+        font-size: 17px;
+    }
+
+    .aijs-option-list {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    .aijs-option-btn {
+        padding: 16px 20px;
+    }
+
+    .aijs-timer-hero {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        padding: 10px 24px;
+    }
+    .aijs-timer-hero-time   { font-size: 36px; }
+    .aijs-timer-hero-label  { margin: 0; }
+    .aijs-timer-hero-section,
+    .aijs-timer-hero-pos    { margin: 0; }
+
+    .aijs-setup-card {
+        max-width: 700px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .aijs-score-wrap {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .aijs-choukai-play-area {
+        padding: 10px;
+    }
+}

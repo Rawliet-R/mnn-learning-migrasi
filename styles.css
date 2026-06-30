@@ -786,7 +786,12 @@
        fixed left sidebar + centered max-width content column.
        Mobile layout (<1024px) completely untouched.
     ═══════════════════════════════════════════════════ */
-    @media (min-width: 1024px) {
+    /* [LANDSCAPE FIX] Layout desktop ini SEKARANG juga aktif saat HP diputar
+   landscape (lebar > tinggi, tinggi terbatas) — tidak hanya saat layar
+   beneran >= 1024px. Supaya seluruh app (bukan cuma AI JFT Simulation)
+   berubah ke mode desktop saat diputar. */
+    @media (min-width: 1024px),
+           (orientation: landscape) and (max-height: 500px) and (min-width: 600px) {
       body {
         display: flex;
         justify-content: center;
