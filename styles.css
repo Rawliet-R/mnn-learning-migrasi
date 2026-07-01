@@ -1220,6 +1220,12 @@
     .reibun-next-drill-btn { display:block; width:100%; margin-top:8px; padding:10px; border-radius:10px; border:none; background:var(--accent-verb); color:#fff; font-size:12px; font-weight:700; cursor:pointer; }
     .reibun-next-drill-btn:active { opacity:.85; }
 
+    /* [ADDITIVE — Flashcard difficulty badge] */
+    .card-diff-badge { display:inline-block; font-size:10px; font-weight:700; padding:2px 8px; border-radius:99px; margin-left:6px; vertical-align:middle; }
+    .card-diff-badge.diff-easy { background:rgba(52,211,153,.12); color:#34d399; border:1px solid rgba(52,211,153,.25); }
+    .card-diff-badge.diff-med  { background:rgba(251,191,36,.1);  color:#fbbf24; border:1px solid rgba(251,191,36,.25); }
+    .card-diff-badge.diff-hard { background:rgba(239,68,68,.1);   color:#ef4444; border:1px solid rgba(239,68,68,.25); }
+
     /* Daily Vocab Review */
     .dvr-card { background:linear-gradient(135deg,rgba(52,211,153,.1),rgba(74,158,255,.07)); border:1px solid rgba(52,211,153,.22); border-radius:18px; padding:16px; margin-bottom:12px; }
     .dvr-header { display:flex; align-items:center; gap:8px; margin-bottom:4px; }

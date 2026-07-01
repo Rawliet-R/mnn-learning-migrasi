@@ -517,13 +517,13 @@ function learnedKey(v) { return (v.kana||v.kanji||'') + '||' + v.arti; }
 // [SENTENCE_ENGINE v1.0] Diperluas: jika bunpou tidak ada contoh,
 // fallback ke SENTENCE_ENGINE.generate() berdasarkan tipe kata.
 function getVocabExample(w, lesson) {
-    // 1. Jika vocab sudah punya field ex, langsung pakai
-    if (w.ex) return { ex: w.ex, ex_romaji: w.ex_romaji||'', ex_id: w.ex_id||'' };
+    // Prioritas baru: bunpou bab ini DULU, baru w.ex sebagai fallback.
+    // Tujuan: contoh kalimat di flashcard menggunakan pola grammar bab yang sedang dipelajari.
 
-    // 2. Cari di bunpou.p yang mengandung kata vocab ini
+    // 1. Cari di bunpou.p bab ini yang mengandung kata vocab ini
     if (lesson && lesson.bunpou) {
-        const target = w.kanji || w.kana;
-        if (target && !target.startsWith('〜') && !target.startsWith('～')) {
+        const target = (w.kanji || w.kana || '').replace(/〜/g,'').replace(/～/g,'').trim();
+        if (target && target.length >= 2) {
             for (const b of lesson.bunpou) {
                 if (!b.p) continue;
                 const lines = b.p.split('\n');
@@ -531,19 +531,28 @@ function getVocabExample(w, lesson) {
                     const m = line.match(/Contoh[:：]\s*(.+)/);
                     if (!m) continue;
                     const raw = m[1].trim();
-                    if (!raw.includes(target.replace(/〜/g,'').replace(/～/g,''))) continue;
+                    if (!raw.includes(target)) continue;
+                    // Ambil kalimat JP dan terjemahan ID dari format "JP（ID）" atau "JP(ID)"
                     const paren = raw.match(/^([^（(]+)[（(]([^）)]+)[）)](.*)$/);
                     if (paren) {
-                        return { ex: paren[1].trim(), ex_romaji: '', ex_id: paren[2].trim() };
+                        return {
+                            ex:       paren[1].trim(),
+                            ex_romaji: '',
+                            ex_id:    paren[2].trim(),
+                            source:   'bunpou',
+                            bunpouTitle: b.title || ''
+                        };
                     }
-                    return { ex: raw, ex_romaji: '', ex_id: '' };
+                    return { ex: raw, ex_romaji: '', ex_id: '', source: 'bunpou', bunpouTitle: b.title || '' };
                 }
             }
         }
     }
 
-    // 3. Tidak ada contoh kalimat di database — tampilkan placeholder
-    // [SENTENCE_ENGINE dinonaktifkan sementara — hanya gunakan contoh dari DB]
+    // 2. Fallback: gunakan contoh bawaan vocab (w.ex)
+    if (w.ex) return { ex: w.ex, ex_romaji: w.ex_romaji||'', ex_id: w.ex_id||'', source: 'vocab' };
+
+    // 3. Tidak ada contoh — tampilkan placeholder
     return { ex: 'Contoh kalimat belum tersedia.', ex_romaji: '', ex_id: '', source: 'empty' };
 }
 
@@ -590,10 +599,51 @@ function updateProgressRing() {
 // ═══════════════════════════════════════════════════════════
 // FLASHCARD
 // ═══════════════════════════════════════════════════════════
+// ── Flashcard: difficulty-sorted vocab order ─────────────────────────
+// STATE.fcOrder = array of indices ke lesson.vocab, urut easy→hard
+// Tidak memutasi lesson.vocab sama sekali.
+
+function getDiffScore(w) {
+    var score = 0;
+    if (w.kanji && w.kanji.trim())             score += 2; // ada kanji → lebih susah
+    if (w.cat === 'verb')                       score += 2; // kata kerja
+    if (w.cat === 'adj')                        score += 1; // kata sifat
+    if ((w.kana || '').replace(/[〜～]/g,'').length > 6) score += 1; // kata panjang
+    return score;
+}
+
+function initFCOrder(lesson) {
+    if (!lesson || !lesson.vocab.length) return;
+    // Buat array indeks lalu sort by difficulty score
+    var indices = lesson.vocab.map(function(_, i){ return i; });
+    indices.sort(function(a, b){ return getDiffScore(lesson.vocab[a]) - getDiffScore(lesson.vocab[b]); });
+    STATE.fcOrder = indices;
+    STATE.fcLessonId = lesson.id; // track agar re-sort saat ganti pelajaran
+}
+
+// Kembalikan vocab yang sudah di-sort (bukan lesson.vocab langsung)
+// Aman karena ini array terpisah, tidak mengubah source data
+function getFCVocab(lesson) {
+    if (!lesson || !lesson.vocab.length) return [];
+    // Re-init kalau lesson baru atau belum pernah di-init
+    if (!STATE.fcOrder || STATE.fcLessonId !== lesson.id || STATE.fcOrder.length !== lesson.vocab.length) {
+        initFCOrder(lesson);
+    }
+    return STATE.fcOrder.map(function(i){ return lesson.vocab[i]; });
+}
+
+function getDiffLabel(w) {
+    var s = getDiffScore(w);
+    if (s <= 1) return { label: 'Mudah', cls: 'diff-easy' };
+    if (s <= 3) return { label: 'Sedang', cls: 'diff-med' };
+    return { label: 'Sulit', cls: 'diff-hard' };
+}
+// ─────────────────────────────────────────────────────────────────────
+
 function renderFlashcard() {
     const lesson = getCurrentLesson();
     if (!lesson || !lesson.vocab.length) return;
-    const vocab = lesson.vocab;
+    const vocab = getFCVocab(lesson);   // sorted easy→hard, tidak mutasi lesson.vocab
     const idx = Math.min(STATE.currentCard, vocab.length - 1);
     const w = vocab[idx];
     STATE.isFlipped = false;
@@ -605,12 +655,24 @@ function renderFlashcard() {
     const flipper = document.getElementById('flashcard-flipper');
     if (flipper) flipper.classList.remove('is-flipped');
 
-    // Category tag
+    // Category tag + difficulty badge
     const catTag = document.getElementById('card-cat-tag');
     if (catTag) {
         const catLabels = { noun: 'Kata Benda', verb: 'Kata Kerja', adj: 'Kata Sifat' };
         catTag.textContent = catLabels[w.cat] || 'Lainnya';
         catTag.className = 'card-category-tag ' + (w.cat === 'noun' ? 'tag-noun' : w.cat === 'verb' ? 'tag-verb' : w.cat === 'adj' ? 'tag-adj' : 'tag-other');
+    }
+    // [ADDITIVE] Difficulty badge — inject next to catTag, buat elemen jika belum ada
+    var diffBadge = document.getElementById('card-diff-badge');
+    if (!diffBadge && catTag && catTag.parentElement) {
+        diffBadge = document.createElement('span');
+        diffBadge.id = 'card-diff-badge';
+        catTag.parentElement.insertBefore(diffBadge, catTag.nextSibling);
+    }
+    if (diffBadge) {
+        var dl = getDiffLabel(w);
+        diffBadge.textContent = dl.label;
+        diffBadge.className = 'card-diff-badge ' + dl.cls;
     }
 
     // Top counter — format "N 転"
@@ -672,9 +734,17 @@ function renderFlashcard() {
         if (exRomaji) { exRomaji.textContent = exData.ex_romaji || ''; exRomaji.style.display = exData.ex_romaji ? '' : 'none'; }
         if (exId) { exId.textContent = isEmpty ? '' : (exData.ex_id || ''); exId.style.display = (exData.ex_id && !isEmpty) ? '' : 'none'; }
 
-        // [SENTENCE_ENGINE dinonaktifkan] — sembunyikan badge pattern/difficulty
+        // Tampilkan label sumber bunpou kalau contoh dari bunpou bab ini
         const exMeta = document.getElementById('cb-ex-meta');
-        if (exMeta) exMeta.style.display = 'none';
+        if (exMeta) {
+            if (exData.source === 'bunpou' && exData.bunpouTitle) {
+                exMeta.textContent = '📌 Pola: ' + exData.bunpouTitle;
+                exMeta.style.display = '';
+                exMeta.className = 'cb-ex-meta cb-ex-meta-bunpou';
+            } else {
+                exMeta.style.display = 'none';
+            }
+        }
     }
 
     // Known badge
@@ -717,7 +787,7 @@ function shuffleFlashcard() {
     const lesson = getCurrentLesson();
     if (!lesson || !lesson.vocab.length) return;
     // Fisher-Yates shuffle on indices, pick a random card that's not current
-    const len = lesson.vocab.length;
+    const len = getFCVocab(lesson).length;
     if (len <= 1) return;
     let next;
     do { next = Math.floor(Math.random() * len); } while (next === STATE.currentCard);
@@ -734,21 +804,21 @@ function flipCard() {
 function goNextCard() {
     const lesson = getCurrentLesson();
     if (!lesson) return;
-    STATE.currentCard = (STATE.currentCard + 1) % lesson.vocab.length;
+    STATE.currentCard = (STATE.currentCard + 1) % getFCVocab(lesson).length;
     renderFlashcard();
 }
 
 function goPrevCard() {
     const lesson = getCurrentLesson();
     if (!lesson) return;
-    STATE.currentCard = (STATE.currentCard - 1 + lesson.vocab.length) % lesson.vocab.length;
+    STATE.currentCard = (STATE.currentCard - 1 + getFCVocab(lesson).length) % getFCVocab(lesson).length;
     renderFlashcard();
 }
 
 function updateLearnedButton() {
     const lesson = getCurrentLesson();
     if (!lesson || !lesson.vocab.length) return;
-    const w = lesson.vocab[STATE.currentCard];
+    const w = getFCVocab(lesson)[STATE.currentCard];
     const key = learnedKey(w);
     const isLearned = STATE.learnedCards.has(key);
     const btn = document.getElementById('btn-mark-learned');
@@ -761,7 +831,7 @@ function updateLearnedButton() {
 function toggleLearnedCard() {
     const lesson = getCurrentLesson();
     if (!lesson || !lesson.vocab.length) return;
-    const w = lesson.vocab[STATE.currentCard];
+    const w = getFCVocab(lesson)[STATE.currentCard];
     const key = learnedKey(w);
     if (STATE.learnedCards.has(key)) {
         STATE.learnedCards.delete(key);
@@ -2097,6 +2167,14 @@ function openChapterFromDashboard(idx) {
 // ═══════════════════════════════════════════════════════════
 function switchSubTab(tab) {
     STATE.currentTab = tab;
+    // [ADDITIVE] Re-init sort order saat masuk flashcard (lesson mungkin berubah)
+    if (tab === 'flashcard') {
+        var _fcL = getCurrentLesson();
+        if (_fcL && STATE.fcLessonId !== _fcL.id) {
+            STATE.currentCard = 0;
+            initFCOrder(_fcL);
+        }
+    }
     ['flashcard','kosakata','bunpou','renshu'].forEach(t => {
         const el = document.getElementById('tab-' + t);
         if (el) el.style.display = t === tab ? '' : 'none';
