@@ -1668,8 +1668,8 @@ function renderBunpou() {
                     <div style="display:flex;align-items:center;gap:8px">
                       ${prog.read ? '<span style="font-size:11px;color:var(--accent-verb)">✓ Dibaca</span>' : ''}
                       <button class="grammar-quick-drill-btn"
-                        onclick="event.stopPropagation();startBunpouDrill(${bi});markPracticed(${bi})"
-                        title="Langsung latihan pola ini">✏️ Latihan</button>
+                        onclick="event.stopPropagation();switchSubTab('renshu')"
+                        title="Buka menu latihan pelajaran ini">✏️ Latihan</button>
                       <span style="font-size:11px;color:var(--text-muted)">▼</span>
                     </div>
                   </div>
@@ -1696,7 +1696,7 @@ function renderBunpou() {
             const fb = creatorFeedback[bi];
             const creatorFbHtml = fb !== undefined
                 ? `<div class="reibun-creator-feedback ${fb?.ok ? 'rcf-ok' : 'rcf-warn'}">${fb?.msg || ''}</div>
-                   ${fb?.ok ? `<button class="reibun-next-drill-btn" onclick="startBunpouDrill(${bi});markPracticed(${bi})">
+                   ${fb?.ok ? `<button class="reibun-next-drill-btn" onclick="switchSubTab('renshu')">
                        ✓ Paham! Lanjut Latihan →
                      </button>` : ''}`
                 : '';
