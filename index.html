@@ -256,20 +256,26 @@
       <div style="height:3px;background:linear-gradient(90deg,#a78bfa,#f472b6,#fb923c,#a78bfa);background-size:200% 100%;animation:shimmer 2s linear infinite"></div>
     <div style="width:100%;background:linear-gradient(135deg,rgba(167,139,250,.15),rgba(244,114,182,.12),rgba(251,146,60,.1));border:2px solid rgba(167,139,250,.5);border-top:none;border-radius:0 0 22px 22px;padding:16px 16px 18px;display:flex;flex-direction:column;align-items:center;gap:10px">
 
-      <!-- Harga Normal — BESAR & CENTERED -->
-      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;width:100%">
-        <div style="font-size:10px;font-weight:700;color:#a78bfa;letter-spacing:.12em;text-transform:uppercase">✦ Harga Normal ✦</div>
+      <!-- Harga dengan diskon -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;width:100%">
+        <!-- Badge diskon -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+          <span style="font-size:10px;font-weight:700;color:var(--text-muted);text-decoration:line-through;opacity:.7">Rp 60.000</span>
+          <span style="font-size:10px;font-weight:800;background:#ef4444;color:#fff;padding:2px 8px;border-radius:99px;letter-spacing:.04em">HEMAT 52%</span>
+        </div>
         <div style="font-size:52px;font-weight:900;color:var(--text-primary);letter-spacing:-2px;line-height:1.05;filter:drop-shadow(0 0 20px rgba(167,139,250,.7));text-align:center">Rp 29.000</div>
+        <div style="font-size:10px;color:#a78bfa;font-weight:600;letter-spacing:.04em">✦ Harga Terjangkau — Berlaku Sementara ✦</div>
       </div>
 
       <!-- Divider -->
       <div style="width:80%;height:1px;background:linear-gradient(90deg,transparent,rgba(167,139,250,.4),transparent)"></div>
 
-      <!-- Info promo selanjutnya -->
-      <div style="width:100%;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.35);border-radius:12px;padding:9px 14px;display:flex;align-items:flex-start;gap:8px">
-        <span style="font-size:14px;flex-shrink:0;margin-top:1px">🎁</span>
-        <div style="font-size:11px;color:var(--text-primary);line-height:1.6">
-          Nantikan <strong style="color:#a78bfa">promo selanjutnya</strong> dari MNN Learning! Ikuti perkembangan kami untuk mendapatkan penawaran spesial.
+      <!-- KANA Learning highlight (ganti promo box) -->
+      <div style="width:100%;background:linear-gradient(135deg,rgba(74,222,128,.08),rgba(52,211,153,.05));border:1px solid rgba(74,222,128,.3);border-radius:12px;padding:10px 14px;display:flex;align-items:flex-start;gap:10px">
+        <span style="font-size:22px;flex-shrink:0">🔡</span>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <div style="font-size:12px;font-weight:800;color:#4ade80">Termasuk KANA Learning Premium</div>
+          <div style="font-size:11px;color:var(--text-muted);line-height:1.5">Aplikasi terpisah khusus untuk menguasai <strong style="color:var(--text-primary)">Hiragana &amp; Katakana</strong> — dengan latihan refleks, kuis, dan pelacak progres belajar kana kamu.</div>
         </div>
       </div>
     </div>
@@ -277,15 +283,17 @@
 
     <!-- ══ EARLY SUPPORTER CARD ══ -->
     <div style="width:100%;background:var(--bg-card);border:1px solid rgba(167,139,250,.3);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:8px">
-      <div style="font-size:11px;font-weight:800;color:#a78bfa;letter-spacing:.06em;text-transform:uppercase">🎯 Early Supporter Program</div>
-      <div style="font-size:11px;color:var(--text-muted);line-height:1.6">Jadilah salah satu pengguna pertama MNN Learning dan dapatkan akses penuh dengan harga spesial.</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:14px">🌟</span>
+        <div style="font-size:11px;font-weight:800;color:#fbbf24;letter-spacing:.04em">RATUSAN PENGGUNA AKTIF TELAH MEMBUKTIKAN</div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);line-height:1.6">"Aplikasi belajar Jepang paling lengkap yang pernah aku pakai — dari kosakata, grammar, sampai kana, semuanya ada." — Member Premium</div>
       <div style="height:1px;background:var(--border)"></div>
       <div style="display:flex;flex-direction:column;gap:7px">
         <div style="font-size:11px;font-weight:600;color:#4ade80">✅ 50 Pelajaran Lengkap <span style="font-weight:400;color:var(--text-muted)">— Buku I &amp; II (85 pelajaran total)</span></div>
         <div style="font-size:11px;font-weight:600;color:#4ade80">✅ 2.318 Kosakata + Quiz <span style="font-weight:400;color:var(--text-muted)">— Semua bab &amp; Master Kotoba</span></div>
         <div style="font-size:11px;font-weight:600;color:#4ade80">✅ 352 Kanji N5–N4 <span style="font-weight:400;color:var(--text-muted)">— Flash card &amp; kuis</span></div>
         <div style="font-size:11px;font-weight:600;color:#4ade80">✅ Renshū &amp; Latihan Lanjutan</div>
-        <div style="font-size:11px;font-weight:600;color:#4ade80">✅ <span style="background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.3);border-radius:6px;padding:1px 7px">🔡 KANA Learning Premium</span> <span style="font-weight:400;color:var(--text-muted)">— Akses app Hiragana &amp; Katakana</span></div>
         <div style="font-size:11px;font-weight:600;color:#4ade80">✅ Update Konten Mendatang <span style="font-weight:400;color:var(--text-muted)">— Gratis</span></div>
         <div style="font-size:11px;font-weight:600;color:#4ade80">✅ Akses Selamanya <span style="font-weight:400;color:var(--text-muted)">— Sekali bayar</span></div>
       </div>
